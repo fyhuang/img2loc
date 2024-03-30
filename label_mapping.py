@@ -62,6 +62,7 @@ class LabelMapping:
         for index, row in df.iterrows():
             assigned_label = mapping.add(row["name"])
             assert assigned_label == row["label"]
+        return mapping
 
     def to_csv(self, path):
         sorted_labels = sorted(self.label_to_name.keys())
