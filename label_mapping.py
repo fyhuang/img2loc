@@ -37,13 +37,8 @@ class LabelMapping:
                 self.add(name)
 
 
-    def add(self, name):
-        assert type(name) == str
-        label = self.next_label
-        self.label_to_name[label] = name
-        self.name_to_label[name] = label
-        self.next_label += 1
-        return label
+    def __len__(self):
+        return len(self.label_to_name)
 
     def get_label(self, name):
         assert type(name) == str
@@ -52,6 +47,15 @@ class LabelMapping:
     def get_name(self, label):
         assert type(label) == int
         return self.label_to_name[label]
+
+    def add(self, name):
+        assert type(name) == str
+        label = self.next_label
+        self.label_to_name[label] = name
+        self.name_to_label[name] = label
+        self.next_label += 1
+        return label
+
 
     @classmethod
     def read_csv(cls, path):
