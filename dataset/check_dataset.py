@@ -13,6 +13,7 @@ def print_context(filenames, i):
 
 def check_filename_list(filenames):
     all_good = True
+    stems_set = set()
 
     # Iterate every two lines
     for i in range(0, len(filenames), 2):
@@ -29,6 +30,14 @@ def check_filename_list(filenames):
             print_context(filenames, i)
             all_good = False
 
+        # Check that stem didn't show up already
+        if path1.stem in stems_set:
+            print("Stem already seen: ", path1)
+            print_context(filenames, i)
+            all_good = False
+        else:
+            stems_set.add(path1.stem)
+
     return all_good
 
 
@@ -40,7 +49,7 @@ def main():
     lines = result.stdout.splitlines()
     filenames = [l.decode('utf-8') for l in lines]
     if check_filename_list(filenames):
-        print("All OK")
+        print(f"{filename}: All OK")
 
 
 if __name__ == "__main__":
