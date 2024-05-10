@@ -10,6 +10,10 @@ Downsides that I discovered during this project
 
 1. Finding specific samples is a bit complicated. For example, during error analysis, I wanted to see which samples from the training set the model was performing worst at. Visualizing the specific samples required another full pass through the training set, since it's not possible to index into a WebDataset.
 1. For the same reason as above, shuffling must be done with a cache. This was one of the reasons I had to move training to cloud: the shuffling ended up using all the RAM on my workstation.
+1. Next time, I should shuffle the data (e.g. in the DataFrame) before building the webdataset.
+   This would make it easier to split the dataset between train/val/test at runtime.
+   Currently splitting must be pre-determined, and any change to splits requires recompiling the dataset (and reuploading/downloading).
+   This would probably also improve the quality of the shuffling.
 
 ## PyTorch Lightning
 

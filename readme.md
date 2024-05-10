@@ -2,9 +2,16 @@
 
 Identify a location in the world without GPS, using only camera images.
 
+Project goals:
+
+- [ ] Train a PyTorch model that predicts location from an image.
+- [ ] Convert model to ONNX. Write demo page to retrieve images from camera and run inference using model.
+- [ ] Try using the model to play GeoGuessr.
+
 Constraints:
 
 * All computation, API access, etc. is self-funded
+* Model size (# parameters) should be small enough to run in a mobile (iPhone) browser
 
 # Tech Stack
 
@@ -149,12 +156,38 @@ So our model should have headroom to beat PlaNet on those dimensions.
 
 What I intend to try next:
 
-* Manual error analysis on validation set.
-* Fine-tune the full model, not just final layers.
-* Pick the learning rate with hyperparameter optimizer.
-* Increase size of dataset in worst-performing areas.
-* Try multi-label classification, to see if learning the parent-child relationship of S2 cells helps.
+* [x] Manual error analysis on validation set.
+* [x] Pick the learning rate with LR finder. (LR finder suggested same LR I was already using, 1e-3)
+* [x] Rewrite training script as plain old Python file (vscode Jupyter isn't too stable over SSH tunneling).
+* [x] Shuffle dataset before compilation.
+* [ ] Fine-tune the full model, not just final layers.
+* [ ] Increase size of dataset in worst-performing areas.
+* [ ] Try multi-label classification, to see if learning the parent-child relationship of S2 cells helps.
 
-# Datasets
+#### Error analysis
 
-# Misc
+I did a quick error analysis by finding the top 10 examples where the model made the worst prediction (largest distance from true location).
+Two things stood out to me:
+
+* Many wrong guesses were made in 94cf (Sao Paolo), mainly images from other major cities.
+* Top 10 wrong guesses were all four-letter tokens, i.e. larger cells.
+
+The wrong predictions were all large cells, which cover more area, and might contain a larger number of examples.
+This made me think the class distribution might be unbalanced, and the model was overfitting by simply selecting cells with more images.
+
+* [x] Double check the distribution of classes in training set.
+
+This only turned out to be mildly informative:
+
+* The class guessed most-incorrectly (94cf) was not in the top 100 most common classes.
+* The most common class (47b7) has 2123 training examples.
+  This seems rather odd since the S2 cell splitting algorithm should have split this cell (with a limit of 500 examples).
+
+* [ ] Check confusion matrix for least-correct cells.
+
+#### Re-reading the paper
+
+I re-read the PlaNet paper and realized that I misinterpreted the results tables.
+The parenthesized numbers are apparently not the number of parameters in the model, as there is a separate table showing the # of parameters by number of classes.
+The actual number of parameters is ~4x higher than I thought.
+Next, I will try training on a larger base model.
