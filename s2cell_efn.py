@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 
 import lightning as L
 from lightning.pytorch.loggers import TensorBoardLogger
+from finetuning_scheduler import FinetuningScheduler, FTSCheckpoint, FTSEarlyStopping
 
 import torchmetrics
 import webdataset as wds
@@ -24,15 +25,17 @@ import tqdm
 import label_mapping
 from datasets import Im2gps2007
 
+
+FT_SCHEDULE_PATH = "finetune_s2cell_efn.yaml"
+
+
 # Define a LightningModule for the classifier
 class S2CellClassifierEfn(L.LightningModule):
-    def __init__(self, num_classes, learning_rate, freeze_features=True):
+    def __init__(self, num_classes, learning_rate):
         super().__init__()
 
         self.learning_rate = learning_rate
-        self.freeze_features = freeze_features
-
-        self.save_hyperparameters(ignore=["freeze_features"])
+        self.save_hyperparameters(ignore=[])
 
         efn = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
 
@@ -50,15 +53,9 @@ class S2CellClassifierEfn(L.LightningModule):
         self.accuracy = torchmetrics.classification.Accuracy(task='multiclass', num_classes=num_classes)
 
     def forward(self, x):
-        if self.freeze_features:
-            with torch.no_grad():
-                x = self.features(x)
-                x = self.avgpool(x)
-                x = torch.flatten(x, 1)
-        else:
-            x = self.features(x)
-            x = self.avgpool(x)
-            x = torch.flatten(x, 1)
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
 
@@ -104,7 +101,7 @@ class S2CellClassifierEfn(L.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
-                "scheduler": optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", patience=5),
+                "scheduler": optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", patience=3),
                 "monitor": "val_acc",
                 "interval": "epoch",
                 "frequency": 1,
@@ -134,7 +131,6 @@ def main():
     mnet3_model = S2CellClassifierEfn(
         num_classes=len(im2gps2007.mapping),
         learning_rate=1e-3,
-        freeze_features=False,
     )
     #LOAD_CHECKPOINT_MAP_LOCATION = {}
     #if not torch.cuda.is_available():
@@ -143,28 +139,50 @@ def main():
     #mnet3_model.load_state_dict(checkpoint["state_dict"])
     #mnet3_model = S2CellClassifierMnet3.load_from_checkpoint("checkpoints/s2cell_predict/version1.ckpt", num_classes=len(mapping))
 
-    trainer = L.Trainer(
-        accelerator=args.accelerator,
-        callbacks=[
-            L.pytorch.callbacks.ModelCheckpoint(
+    callbacks = []
+    if not args.fast_dev_run:
+        callbacks.extend([
+            FinetuningScheduler(
+                gen_ft_sched_only=args.gen_ft_sched_only,
+                ft_schedule=FT_SCHEDULE_PATH,
+            ),
+            FTSCheckpoint(
                 monitor="val_acc",
                 mode="max",
                 save_last=True,
                 save_top_k=5,
             ),
-            L.pytorch.callbacks.EarlyStopping(
-                patience=10,
+            FTSEarlyStopping(
+                patience=5,
                 monitor="val_acc",
                 mode="max",
                 verbose=True,
             ),
-            L.pytorch.callbacks.LearningRateMonitor(
-                logging_interval="step"
-            ),
-        ],
-        fast_dev_run=args.fast_dev_run,
+        ])
+    callbacks.append(
+        L.pytorch.callbacks.LearningRateMonitor(
+            logging_interval="step"
+        ),
+    )
+
+    fast_dev_run_args = {}
+    if args.fast_dev_run:
+        # FinetuningScheduler seems to fail if checkpointing/logging not enabled, so only keep the
+        # flags that limit runtime
+        fast_dev_run_args = {
+            "max_epochs": 1,
+            "max_steps": 1,
+            "num_sanity_val_steps": 0,
+            "val_check_interval": 1.0,
+            "check_val_every_n_epoch": 1,
+        }
+
+    trainer = L.Trainer(
+        accelerator=args.accelerator,
+        callbacks=callbacks,
         limit_train_batches=args.limit_batches,
         limit_val_batches=args.limit_batches,
+        **fast_dev_run_args,
     )
     trainer.fit(
         model=mnet3_model,

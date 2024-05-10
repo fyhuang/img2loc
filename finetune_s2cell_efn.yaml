@@ -1,0 +1,1016 @@
+0:
+  params:
+  - classifier.1.*
+1:
+  params:
+  - features.*
+  #- features.*.*.block.*.*.*
+
+#1:
+#  params:
+#  - features.8.1.bias
+#  - features.8.1.weight
+#2:
+#  params:
+#  - features.8.0.weight
+#  - features.7.2.block.3.1.bias
+#3:
+#  params:
+#  - features.7.2.block.3.1.weight
+#  - features.7.2.block.3.0.weight
+#4:
+#  params:
+#  - features.7.2.block.2.fc2.bias
+#  - features.7.2.block.2.fc2.weight
+#5:
+#  params:
+#  - features.7.2.block.2.fc1.bias
+#  - features.7.2.block.2.fc1.weight
+#6:
+#  params:
+#  - features.7.2.block.1.1.bias
+#  - features.7.2.block.1.1.weight
+#7:
+#  params:
+#  - features.7.2.block.1.0.weight
+#  - features.7.2.block.0.1.bias
+#8:
+#  params:
+#  - features.7.2.block.0.1.weight
+#  - features.7.2.block.0.0.weight
+#9:
+#  params:
+#  - features.7.1.block.3.1.bias
+#  - features.7.1.block.3.1.weight
+#10:
+#  params:
+#  - features.7.1.block.3.0.weight
+#  - features.7.1.block.2.fc2.bias
+#11:
+#  params:
+#  - features.7.1.block.2.fc2.weight
+#  - features.7.1.block.2.fc1.bias
+#12:
+#  params:
+#  - features.7.1.block.2.fc1.weight
+#  - features.7.1.block.1.1.bias
+#13:
+#  params:
+#  - features.7.1.block.1.1.weight
+#  - features.7.1.block.1.0.weight
+#14:
+#  params:
+#  - features.7.1.block.0.1.bias
+#  - features.7.1.block.0.1.weight
+#15:
+#  params:
+#  - features.7.1.block.0.0.weight
+#  - features.7.0.block.3.1.bias
+#16:
+#  params:
+#  - features.7.0.block.3.1.weight
+#  - features.7.0.block.3.0.weight
+#17:
+#  params:
+#  - features.7.0.block.2.fc2.bias
+#  - features.7.0.block.2.fc2.weight
+#18:
+#  params:
+#  - features.7.0.block.2.fc1.bias
+#  - features.7.0.block.2.fc1.weight
+#19:
+#  params:
+#  - features.7.0.block.1.1.bias
+#  - features.7.0.block.1.1.weight
+#20:
+#  params:
+#  - features.7.0.block.1.0.weight
+#  - features.7.0.block.0.1.bias
+#21:
+#  params:
+#  - features.7.0.block.0.1.weight
+#  - features.7.0.block.0.0.weight
+#22:
+#  params:
+#  - features.6.8.block.3.1.bias
+#  - features.6.8.block.3.1.weight
+#23:
+#  params:
+#  - features.6.8.block.3.0.weight
+#  - features.6.8.block.2.fc2.bias
+#24:
+#  params:
+#  - features.6.8.block.2.fc2.weight
+#  - features.6.8.block.2.fc1.bias
+#25:
+#  params:
+#  - features.6.8.block.2.fc1.weight
+#  - features.6.8.block.1.1.bias
+#26:
+#  params:
+#  - features.6.8.block.1.1.weight
+#  - features.6.8.block.1.0.weight
+#27:
+#  params:
+#  - features.6.8.block.0.1.bias
+#  - features.6.8.block.0.1.weight
+#28:
+#  params:
+#  - features.6.8.block.0.0.weight
+#  - features.6.7.block.3.1.bias
+#29:
+#  params:
+#  - features.6.7.block.3.1.weight
+#  - features.6.7.block.3.0.weight
+#30:
+#  params:
+#  - features.6.7.block.2.fc2.bias
+#  - features.6.7.block.2.fc2.weight
+#31:
+#  params:
+#  - features.6.7.block.2.fc1.bias
+#  - features.6.7.block.2.fc1.weight
+#32:
+#  params:
+#  - features.6.7.block.1.1.bias
+#  - features.6.7.block.1.1.weight
+#33:
+#  params:
+#  - features.6.7.block.1.0.weight
+#  - features.6.7.block.0.1.bias
+#34:
+#  params:
+#  - features.6.7.block.0.1.weight
+#  - features.6.7.block.0.0.weight
+#35:
+#  params:
+#  - features.6.6.block.3.1.bias
+#  - features.6.6.block.3.1.weight
+#36:
+#  params:
+#  - features.6.6.block.3.0.weight
+#  - features.6.6.block.2.fc2.bias
+#37:
+#  params:
+#  - features.6.6.block.2.fc2.weight
+#  - features.6.6.block.2.fc1.bias
+#38:
+#  params:
+#  - features.6.6.block.2.fc1.weight
+#  - features.6.6.block.1.1.bias
+#39:
+#  params:
+#  - features.6.6.block.1.1.weight
+#  - features.6.6.block.1.0.weight
+#40:
+#  params:
+#  - features.6.6.block.0.1.bias
+#  - features.6.6.block.0.1.weight
+#41:
+#  params:
+#  - features.6.6.block.0.0.weight
+#  - features.6.5.block.3.1.bias
+#42:
+#  params:
+#  - features.6.5.block.3.1.weight
+#  - features.6.5.block.3.0.weight
+#43:
+#  params:
+#  - features.6.5.block.2.fc2.bias
+#  - features.6.5.block.2.fc2.weight
+#44:
+#  params:
+#  - features.6.5.block.2.fc1.bias
+#  - features.6.5.block.2.fc1.weight
+#45:
+#  params:
+#  - features.6.5.block.1.1.bias
+#  - features.6.5.block.1.1.weight
+#46:
+#  params:
+#  - features.6.5.block.1.0.weight
+#  - features.6.5.block.0.1.bias
+#47:
+#  params:
+#  - features.6.5.block.0.1.weight
+#  - features.6.5.block.0.0.weight
+#48:
+#  params:
+#  - features.6.4.block.3.1.bias
+#  - features.6.4.block.3.1.weight
+#49:
+#  params:
+#  - features.6.4.block.3.0.weight
+#  - features.6.4.block.2.fc2.bias
+#50:
+#  params:
+#  - features.6.4.block.2.fc2.weight
+#  - features.6.4.block.2.fc1.bias
+#51:
+#  params:
+#  - features.6.4.block.2.fc1.weight
+#  - features.6.4.block.1.1.bias
+#52:
+#  params:
+#  - features.6.4.block.1.1.weight
+#  - features.6.4.block.1.0.weight
+#53:
+#  params:
+#  - features.6.4.block.0.1.bias
+#  - features.6.4.block.0.1.weight
+#54:
+#  params:
+#  - features.6.4.block.0.0.weight
+#  - features.6.3.block.3.1.bias
+#55:
+#  params:
+#  - features.6.3.block.3.1.weight
+#  - features.6.3.block.3.0.weight
+#56:
+#  params:
+#  - features.6.3.block.2.fc2.bias
+#  - features.6.3.block.2.fc2.weight
+#57:
+#  params:
+#  - features.6.3.block.2.fc1.bias
+#  - features.6.3.block.2.fc1.weight
+#58:
+#  params:
+#  - features.6.3.block.1.1.bias
+#  - features.6.3.block.1.1.weight
+#59:
+#  params:
+#  - features.6.3.block.1.0.weight
+#  - features.6.3.block.0.1.bias
+#60:
+#  params:
+#  - features.6.3.block.0.1.weight
+#  - features.6.3.block.0.0.weight
+#61:
+#  params:
+#  - features.6.2.block.3.1.bias
+#  - features.6.2.block.3.1.weight
+#62:
+#  params:
+#  - features.6.2.block.3.0.weight
+#  - features.6.2.block.2.fc2.bias
+#63:
+#  params:
+#  - features.6.2.block.2.fc2.weight
+#  - features.6.2.block.2.fc1.bias
+#64:
+#  params:
+#  - features.6.2.block.2.fc1.weight
+#  - features.6.2.block.1.1.bias
+#65:
+#  params:
+#  - features.6.2.block.1.1.weight
+#  - features.6.2.block.1.0.weight
+#66:
+#  params:
+#  - features.6.2.block.0.1.bias
+#  - features.6.2.block.0.1.weight
+#67:
+#  params:
+#  - features.6.2.block.0.0.weight
+#  - features.6.1.block.3.1.bias
+#68:
+#  params:
+#  - features.6.1.block.3.1.weight
+#  - features.6.1.block.3.0.weight
+#69:
+#  params:
+#  - features.6.1.block.2.fc2.bias
+#  - features.6.1.block.2.fc2.weight
+#70:
+#  params:
+#  - features.6.1.block.2.fc1.bias
+#  - features.6.1.block.2.fc1.weight
+#71:
+#  params:
+#  - features.6.1.block.1.1.bias
+#  - features.6.1.block.1.1.weight
+#72:
+#  params:
+#  - features.6.1.block.1.0.weight
+#  - features.6.1.block.0.1.bias
+#73:
+#  params:
+#  - features.6.1.block.0.1.weight
+#  - features.6.1.block.0.0.weight
+#74:
+#  params:
+#  - features.6.0.block.3.1.bias
+#  - features.6.0.block.3.1.weight
+#75:
+#  params:
+#  - features.6.0.block.3.0.weight
+#  - features.6.0.block.2.fc2.bias
+#76:
+#  params:
+#  - features.6.0.block.2.fc2.weight
+#  - features.6.0.block.2.fc1.bias
+#77:
+#  params:
+#  - features.6.0.block.2.fc1.weight
+#  - features.6.0.block.1.1.bias
+#78:
+#  params:
+#  - features.6.0.block.1.1.weight
+#  - features.6.0.block.1.0.weight
+#79:
+#  params:
+#  - features.6.0.block.0.1.bias
+#  - features.6.0.block.0.1.weight
+#80:
+#  params:
+#  - features.6.0.block.0.0.weight
+#  - features.5.6.block.3.1.bias
+#81:
+#  params:
+#  - features.5.6.block.3.1.weight
+#  - features.5.6.block.3.0.weight
+#82:
+#  params:
+#  - features.5.6.block.2.fc2.bias
+#  - features.5.6.block.2.fc2.weight
+#83:
+#  params:
+#  - features.5.6.block.2.fc1.bias
+#  - features.5.6.block.2.fc1.weight
+#84:
+#  params:
+#  - features.5.6.block.1.1.bias
+#  - features.5.6.block.1.1.weight
+#85:
+#  params:
+#  - features.5.6.block.1.0.weight
+#  - features.5.6.block.0.1.bias
+#86:
+#  params:
+#  - features.5.6.block.0.1.weight
+#  - features.5.6.block.0.0.weight
+#87:
+#  params:
+#  - features.5.5.block.3.1.bias
+#  - features.5.5.block.3.1.weight
+#88:
+#  params:
+#  - features.5.5.block.3.0.weight
+#  - features.5.5.block.2.fc2.bias
+#89:
+#  params:
+#  - features.5.5.block.2.fc2.weight
+#  - features.5.5.block.2.fc1.bias
+#90:
+#  params:
+#  - features.5.5.block.2.fc1.weight
+#  - features.5.5.block.1.1.bias
+#91:
+#  params:
+#  - features.5.5.block.1.1.weight
+#  - features.5.5.block.1.0.weight
+#92:
+#  params:
+#  - features.5.5.block.0.1.bias
+#  - features.5.5.block.0.1.weight
+#93:
+#  params:
+#  - features.5.5.block.0.0.weight
+#  - features.5.4.block.3.1.bias
+#94:
+#  params:
+#  - features.5.4.block.3.1.weight
+#  - features.5.4.block.3.0.weight
+#95:
+#  params:
+#  - features.5.4.block.2.fc2.bias
+#  - features.5.4.block.2.fc2.weight
+#96:
+#  params:
+#  - features.5.4.block.2.fc1.bias
+#  - features.5.4.block.2.fc1.weight
+#97:
+#  params:
+#  - features.5.4.block.1.1.bias
+#  - features.5.4.block.1.1.weight
+#98:
+#  params:
+#  - features.5.4.block.1.0.weight
+#  - features.5.4.block.0.1.bias
+#99:
+#  params:
+#  - features.5.4.block.0.1.weight
+#  - features.5.4.block.0.0.weight
+#100:
+#  params:
+#  - features.5.3.block.3.1.bias
+#  - features.5.3.block.3.1.weight
+#101:
+#  params:
+#  - features.5.3.block.3.0.weight
+#  - features.5.3.block.2.fc2.bias
+#102:
+#  params:
+#  - features.5.3.block.2.fc2.weight
+#  - features.5.3.block.2.fc1.bias
+#103:
+#  params:
+#  - features.5.3.block.2.fc1.weight
+#  - features.5.3.block.1.1.bias
+#104:
+#  params:
+#  - features.5.3.block.1.1.weight
+#  - features.5.3.block.1.0.weight
+#105:
+#  params:
+#  - features.5.3.block.0.1.bias
+#  - features.5.3.block.0.1.weight
+#106:
+#  params:
+#  - features.5.3.block.0.0.weight
+#  - features.5.2.block.3.1.bias
+#107:
+#  params:
+#  - features.5.2.block.3.1.weight
+#  - features.5.2.block.3.0.weight
+#108:
+#  params:
+#  - features.5.2.block.2.fc2.bias
+#  - features.5.2.block.2.fc2.weight
+#109:
+#  params:
+#  - features.5.2.block.2.fc1.bias
+#  - features.5.2.block.2.fc1.weight
+#110:
+#  params:
+#  - features.5.2.block.1.1.bias
+#  - features.5.2.block.1.1.weight
+#111:
+#  params:
+#  - features.5.2.block.1.0.weight
+#  - features.5.2.block.0.1.bias
+#112:
+#  params:
+#  - features.5.2.block.0.1.weight
+#  - features.5.2.block.0.0.weight
+#113:
+#  params:
+#  - features.5.1.block.3.1.bias
+#  - features.5.1.block.3.1.weight
+#114:
+#  params:
+#  - features.5.1.block.3.0.weight
+#  - features.5.1.block.2.fc2.bias
+#115:
+#  params:
+#  - features.5.1.block.2.fc2.weight
+#  - features.5.1.block.2.fc1.bias
+#116:
+#  params:
+#  - features.5.1.block.2.fc1.weight
+#  - features.5.1.block.1.1.bias
+#117:
+#  params:
+#  - features.5.1.block.1.1.weight
+#  - features.5.1.block.1.0.weight
+#118:
+#  params:
+#  - features.5.1.block.0.1.bias
+#  - features.5.1.block.0.1.weight
+#119:
+#  params:
+#  - features.5.1.block.0.0.weight
+#  - features.5.0.block.3.1.bias
+#120:
+#  params:
+#  - features.5.0.block.3.1.weight
+#  - features.5.0.block.3.0.weight
+#121:
+#  params:
+#  - features.5.0.block.2.fc2.bias
+#  - features.5.0.block.2.fc2.weight
+#122:
+#  params:
+#  - features.5.0.block.2.fc1.bias
+#  - features.5.0.block.2.fc1.weight
+#123:
+#  params:
+#  - features.5.0.block.1.1.bias
+#  - features.5.0.block.1.1.weight
+#124:
+#  params:
+#  - features.5.0.block.1.0.weight
+#  - features.5.0.block.0.1.bias
+#125:
+#  params:
+#  - features.5.0.block.0.1.weight
+#  - features.5.0.block.0.0.weight
+#126:
+#  params:
+#  - features.4.6.block.3.1.bias
+#  - features.4.6.block.3.1.weight
+#127:
+#  params:
+#  - features.4.6.block.3.0.weight
+#  - features.4.6.block.2.fc2.bias
+#128:
+#  params:
+#  - features.4.6.block.2.fc2.weight
+#  - features.4.6.block.2.fc1.bias
+#129:
+#  params:
+#  - features.4.6.block.2.fc1.weight
+#  - features.4.6.block.1.1.bias
+#130:
+#  params:
+#  - features.4.6.block.1.1.weight
+#  - features.4.6.block.1.0.weight
+#131:
+#  params:
+#  - features.4.6.block.0.1.bias
+#  - features.4.6.block.0.1.weight
+#132:
+#  params:
+#  - features.4.6.block.0.0.weight
+#  - features.4.5.block.3.1.bias
+#133:
+#  params:
+#  - features.4.5.block.3.1.weight
+#  - features.4.5.block.3.0.weight
+#134:
+#  params:
+#  - features.4.5.block.2.fc2.bias
+#  - features.4.5.block.2.fc2.weight
+#135:
+#  params:
+#  - features.4.5.block.2.fc1.bias
+#  - features.4.5.block.2.fc1.weight
+#136:
+#  params:
+#  - features.4.5.block.1.1.bias
+#  - features.4.5.block.1.1.weight
+#137:
+#  params:
+#  - features.4.5.block.1.0.weight
+#  - features.4.5.block.0.1.bias
+#138:
+#  params:
+#  - features.4.5.block.0.1.weight
+#  - features.4.5.block.0.0.weight
+#139:
+#  params:
+#  - features.4.4.block.3.1.bias
+#  - features.4.4.block.3.1.weight
+#140:
+#  params:
+#  - features.4.4.block.3.0.weight
+#  - features.4.4.block.2.fc2.bias
+#141:
+#  params:
+#  - features.4.4.block.2.fc2.weight
+#  - features.4.4.block.2.fc1.bias
+#142:
+#  params:
+#  - features.4.4.block.2.fc1.weight
+#  - features.4.4.block.1.1.bias
+#143:
+#  params:
+#  - features.4.4.block.1.1.weight
+#  - features.4.4.block.1.0.weight
+#144:
+#  params:
+#  - features.4.4.block.0.1.bias
+#  - features.4.4.block.0.1.weight
+#145:
+#  params:
+#  - features.4.4.block.0.0.weight
+#  - features.4.3.block.3.1.bias
+#146:
+#  params:
+#  - features.4.3.block.3.1.weight
+#  - features.4.3.block.3.0.weight
+#147:
+#  params:
+#  - features.4.3.block.2.fc2.bias
+#  - features.4.3.block.2.fc2.weight
+#148:
+#  params:
+#  - features.4.3.block.2.fc1.bias
+#  - features.4.3.block.2.fc1.weight
+#149:
+#  params:
+#  - features.4.3.block.1.1.bias
+#  - features.4.3.block.1.1.weight
+#150:
+#  params:
+#  - features.4.3.block.1.0.weight
+#  - features.4.3.block.0.1.bias
+#151:
+#  params:
+#  - features.4.3.block.0.1.weight
+#  - features.4.3.block.0.0.weight
+#152:
+#  params:
+#  - features.4.2.block.3.1.bias
+#  - features.4.2.block.3.1.weight
+#153:
+#  params:
+#  - features.4.2.block.3.0.weight
+#  - features.4.2.block.2.fc2.bias
+#154:
+#  params:
+#  - features.4.2.block.2.fc2.weight
+#  - features.4.2.block.2.fc1.bias
+#155:
+#  params:
+#  - features.4.2.block.2.fc1.weight
+#  - features.4.2.block.1.1.bias
+#156:
+#  params:
+#  - features.4.2.block.1.1.weight
+#  - features.4.2.block.1.0.weight
+#157:
+#  params:
+#  - features.4.2.block.0.1.bias
+#  - features.4.2.block.0.1.weight
+#158:
+#  params:
+#  - features.4.2.block.0.0.weight
+#  - features.4.1.block.3.1.bias
+#159:
+#  params:
+#  - features.4.1.block.3.1.weight
+#  - features.4.1.block.3.0.weight
+#160:
+#  params:
+#  - features.4.1.block.2.fc2.bias
+#  - features.4.1.block.2.fc2.weight
+#161:
+#  params:
+#  - features.4.1.block.2.fc1.bias
+#  - features.4.1.block.2.fc1.weight
+#162:
+#  params:
+#  - features.4.1.block.1.1.bias
+#  - features.4.1.block.1.1.weight
+#163:
+#  params:
+#  - features.4.1.block.1.0.weight
+#  - features.4.1.block.0.1.bias
+#164:
+#  params:
+#  - features.4.1.block.0.1.weight
+#  - features.4.1.block.0.0.weight
+#165:
+#  params:
+#  - features.4.0.block.3.1.bias
+#  - features.4.0.block.3.1.weight
+#166:
+#  params:
+#  - features.4.0.block.3.0.weight
+#  - features.4.0.block.2.fc2.bias
+#167:
+#  params:
+#  - features.4.0.block.2.fc2.weight
+#  - features.4.0.block.2.fc1.bias
+#168:
+#  params:
+#  - features.4.0.block.2.fc1.weight
+#  - features.4.0.block.1.1.bias
+#169:
+#  params:
+#  - features.4.0.block.1.1.weight
+#  - features.4.0.block.1.0.weight
+#170:
+#  params:
+#  - features.4.0.block.0.1.bias
+#  - features.4.0.block.0.1.weight
+#171:
+#  params:
+#  - features.4.0.block.0.0.weight
+#  - features.3.4.block.3.1.bias
+#172:
+#  params:
+#  - features.3.4.block.3.1.weight
+#  - features.3.4.block.3.0.weight
+#173:
+#  params:
+#  - features.3.4.block.2.fc2.bias
+#  - features.3.4.block.2.fc2.weight
+#174:
+#  params:
+#  - features.3.4.block.2.fc1.bias
+#  - features.3.4.block.2.fc1.weight
+#175:
+#  params:
+#  - features.3.4.block.1.1.bias
+#  - features.3.4.block.1.1.weight
+#176:
+#  params:
+#  - features.3.4.block.1.0.weight
+#  - features.3.4.block.0.1.bias
+#177:
+#  params:
+#  - features.3.4.block.0.1.weight
+#  - features.3.4.block.0.0.weight
+#178:
+#  params:
+#  - features.3.3.block.3.1.bias
+#  - features.3.3.block.3.1.weight
+#179:
+#  params:
+#  - features.3.3.block.3.0.weight
+#  - features.3.3.block.2.fc2.bias
+#180:
+#  params:
+#  - features.3.3.block.2.fc2.weight
+#  - features.3.3.block.2.fc1.bias
+#181:
+#  params:
+#  - features.3.3.block.2.fc1.weight
+#  - features.3.3.block.1.1.bias
+#182:
+#  params:
+#  - features.3.3.block.1.1.weight
+#  - features.3.3.block.1.0.weight
+#183:
+#  params:
+#  - features.3.3.block.0.1.bias
+#  - features.3.3.block.0.1.weight
+#184:
+#  params:
+#  - features.3.3.block.0.0.weight
+#  - features.3.2.block.3.1.bias
+#185:
+#  params:
+#  - features.3.2.block.3.1.weight
+#  - features.3.2.block.3.0.weight
+#186:
+#  params:
+#  - features.3.2.block.2.fc2.bias
+#  - features.3.2.block.2.fc2.weight
+#187:
+#  params:
+#  - features.3.2.block.2.fc1.bias
+#  - features.3.2.block.2.fc1.weight
+#188:
+#  params:
+#  - features.3.2.block.1.1.bias
+#  - features.3.2.block.1.1.weight
+#189:
+#  params:
+#  - features.3.2.block.1.0.weight
+#  - features.3.2.block.0.1.bias
+#190:
+#  params:
+#  - features.3.2.block.0.1.weight
+#  - features.3.2.block.0.0.weight
+#191:
+#  params:
+#  - features.3.1.block.3.1.bias
+#  - features.3.1.block.3.1.weight
+#192:
+#  params:
+#  - features.3.1.block.3.0.weight
+#  - features.3.1.block.2.fc2.bias
+#193:
+#  params:
+#  - features.3.1.block.2.fc2.weight
+#  - features.3.1.block.2.fc1.bias
+#194:
+#  params:
+#  - features.3.1.block.2.fc1.weight
+#  - features.3.1.block.1.1.bias
+#195:
+#  params:
+#  - features.3.1.block.1.1.weight
+#  - features.3.1.block.1.0.weight
+#196:
+#  params:
+#  - features.3.1.block.0.1.bias
+#  - features.3.1.block.0.1.weight
+#197:
+#  params:
+#  - features.3.1.block.0.0.weight
+#  - features.3.0.block.3.1.bias
+#198:
+#  params:
+#  - features.3.0.block.3.1.weight
+#  - features.3.0.block.3.0.weight
+#199:
+#  params:
+#  - features.3.0.block.2.fc2.bias
+#  - features.3.0.block.2.fc2.weight
+#200:
+#  params:
+#  - features.3.0.block.2.fc1.bias
+#  - features.3.0.block.2.fc1.weight
+#201:
+#  params:
+#  - features.3.0.block.1.1.bias
+#  - features.3.0.block.1.1.weight
+#202:
+#  params:
+#  - features.3.0.block.1.0.weight
+#  - features.3.0.block.0.1.bias
+#203:
+#  params:
+#  - features.3.0.block.0.1.weight
+#  - features.3.0.block.0.0.weight
+#204:
+#  params:
+#  - features.2.4.block.3.1.bias
+#  - features.2.4.block.3.1.weight
+#205:
+#  params:
+#  - features.2.4.block.3.0.weight
+#  - features.2.4.block.2.fc2.bias
+#206:
+#  params:
+#  - features.2.4.block.2.fc2.weight
+#  - features.2.4.block.2.fc1.bias
+#207:
+#  params:
+#  - features.2.4.block.2.fc1.weight
+#  - features.2.4.block.1.1.bias
+#208:
+#  params:
+#  - features.2.4.block.1.1.weight
+#  - features.2.4.block.1.0.weight
+#209:
+#  params:
+#  - features.2.4.block.0.1.bias
+#  - features.2.4.block.0.1.weight
+#210:
+#  params:
+#  - features.2.4.block.0.0.weight
+#  - features.2.3.block.3.1.bias
+#211:
+#  params:
+#  - features.2.3.block.3.1.weight
+#  - features.2.3.block.3.0.weight
+#212:
+#  params:
+#  - features.2.3.block.2.fc2.bias
+#  - features.2.3.block.2.fc2.weight
+#213:
+#  params:
+#  - features.2.3.block.2.fc1.bias
+#  - features.2.3.block.2.fc1.weight
+#214:
+#  params:
+#  - features.2.3.block.1.1.bias
+#  - features.2.3.block.1.1.weight
+#215:
+#  params:
+#  - features.2.3.block.1.0.weight
+#  - features.2.3.block.0.1.bias
+#216:
+#  params:
+#  - features.2.3.block.0.1.weight
+#  - features.2.3.block.0.0.weight
+#217:
+#  params:
+#  - features.2.2.block.3.1.bias
+#  - features.2.2.block.3.1.weight
+#218:
+#  params:
+#  - features.2.2.block.3.0.weight
+#  - features.2.2.block.2.fc2.bias
+#219:
+#  params:
+#  - features.2.2.block.2.fc2.weight
+#  - features.2.2.block.2.fc1.bias
+#220:
+#  params:
+#  - features.2.2.block.2.fc1.weight
+#  - features.2.2.block.1.1.bias
+#221:
+#  params:
+#  - features.2.2.block.1.1.weight
+#  - features.2.2.block.1.0.weight
+#222:
+#  params:
+#  - features.2.2.block.0.1.bias
+#  - features.2.2.block.0.1.weight
+#223:
+#  params:
+#  - features.2.2.block.0.0.weight
+#  - features.2.1.block.3.1.bias
+#224:
+#  params:
+#  - features.2.1.block.3.1.weight
+#  - features.2.1.block.3.0.weight
+#225:
+#  params:
+#  - features.2.1.block.2.fc2.bias
+#  - features.2.1.block.2.fc2.weight
+#226:
+#  params:
+#  - features.2.1.block.2.fc1.bias
+#  - features.2.1.block.2.fc1.weight
+#227:
+#  params:
+#  - features.2.1.block.1.1.bias
+#  - features.2.1.block.1.1.weight
+#228:
+#  params:
+#  - features.2.1.block.1.0.weight
+#  - features.2.1.block.0.1.bias
+#229:
+#  params:
+#  - features.2.1.block.0.1.weight
+#  - features.2.1.block.0.0.weight
+#230:
+#  params:
+#  - features.2.0.block.3.1.bias
+#  - features.2.0.block.3.1.weight
+#231:
+#  params:
+#  - features.2.0.block.3.0.weight
+#  - features.2.0.block.2.fc2.bias
+#232:
+#  params:
+#  - features.2.0.block.2.fc2.weight
+#  - features.2.0.block.2.fc1.bias
+#233:
+#  params:
+#  - features.2.0.block.2.fc1.weight
+#  - features.2.0.block.1.1.bias
+#234:
+#  params:
+#  - features.2.0.block.1.1.weight
+#  - features.2.0.block.1.0.weight
+#235:
+#  params:
+#  - features.2.0.block.0.1.bias
+#  - features.2.0.block.0.1.weight
+#236:
+#  params:
+#  - features.2.0.block.0.0.weight
+#  - features.1.2.block.2.1.bias
+#237:
+#  params:
+#  - features.1.2.block.2.1.weight
+#  - features.1.2.block.2.0.weight
+#238:
+#  params:
+#  - features.1.2.block.1.fc2.bias
+#  - features.1.2.block.1.fc2.weight
+#239:
+#  params:
+#  - features.1.2.block.1.fc1.bias
+#  - features.1.2.block.1.fc1.weight
+#240:
+#  params:
+#  - features.1.2.block.0.1.bias
+#  - features.1.2.block.0.1.weight
+#241:
+#  params:
+#  - features.1.2.block.0.0.weight
+#  - features.1.1.block.2.1.bias
+#242:
+#  params:
+#  - features.1.1.block.2.1.weight
+#  - features.1.1.block.2.0.weight
+#243:
+#  params:
+#  - features.1.1.block.1.fc2.bias
+#  - features.1.1.block.1.fc2.weight
+#244:
+#  params:
+#  - features.1.1.block.1.fc1.bias
+#  - features.1.1.block.1.fc1.weight
+#245:
+#  params:
+#  - features.1.1.block.0.1.bias
+#  - features.1.1.block.0.1.weight
+#246:
+#  params:
+#  - features.1.1.block.0.0.weight
+#  - features.1.0.block.2.1.bias
+#247:
+#  params:
+#  - features.1.0.block.2.1.weight
+#  - features.1.0.block.2.0.weight
+#248:
+#  params:
+#  - features.1.0.block.1.fc2.bias
+#  - features.1.0.block.1.fc2.weight
+#249:
+#  params:
+#  - features.1.0.block.1.fc1.bias
+#  - features.1.0.block.1.fc1.weight
+#250:
+#  params:
+#  - features.1.0.block.0.1.bias
+#  - features.1.0.block.0.1.weight
+#251:
+#  params:
+#  - features.1.0.block.0.0.weight
+#  - features.0.1.bias
+#252:
+#  params:
+#  - features.0.1.weight
+#  - features.0.0.weight
