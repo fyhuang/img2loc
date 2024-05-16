@@ -14,6 +14,7 @@ import pandas
 import matplotlib.pyplot as plt
 
 import lightning as L
+import lightning.pytorch.tuner
 from lightning.pytorch.loggers import TensorBoardLogger
 from finetuning_scheduler import FinetuningScheduler, FTSCheckpoint, FTSEarlyStopping
 
@@ -100,12 +101,12 @@ class S2CellClassifierEfn(L.LightningModule):
         optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
         return {
             "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", patience=3),
-                "monitor": "val_acc",
-                "interval": "epoch",
-                "frequency": 1,
-            },
+            #"lr_scheduler": {
+            #    "scheduler": optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", patience=3),
+            #    "monitor": "val_acc",
+            #    "interval": "epoch",
+            #    "frequency": 1,
+            #},
         }
 
 
@@ -113,34 +114,30 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--accelerator", type=str, default="cpu")
     parser.add_argument("--ckpt_path", type=str, default=None)
-    parser.add_argument("--limit_batches", type=float, default=1.0)
+    parser.add_argument("--limit_batches", type=float, default=None)
 
-    parser.add_argument("--fast_dev_run", action="store_true")
-    parser.add_argument("--gen_ft_sched_only", action="store_true")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["train", "fast_dev_run", "gen_ft_sched", "lr_find"],
+        default="fast_dev_run",
+    )
+    #parser.add_argument("--fast_dev_run", action="store_true")
+    #parser.add_argument("--gen_ft_sched_only", action="store_true")
+    #parser.add_argument("--lr_finder", action="store_true")
 
     args = parser.parse_args()
 
     im2gps2007 = Im2gps2007()
     train_dataloader = im2gps2007.train_dataloader()
     val_dataloader = im2gps2007.val_dataloader()
-
-    # Full training (start with frozen layers, then unfreeze)
-
-    # Temporarily load checkpoint manually (since we changed the model interface)
-    #checkpoint = torch.load("checkpoints/s2cell_predict/version2.ckpt", **LOAD_CHECKPOINT_MAP_LOCATION)
-    mnet3_model = S2CellClassifierEfn(
+    efn_model = S2CellClassifierEfn(
         num_classes=len(im2gps2007.mapping),
         learning_rate=1e-3,
     )
-    #LOAD_CHECKPOINT_MAP_LOCATION = {}
-    #if not torch.cuda.is_available():
-    #    LOAD_CHECKPOINT_MAP_LOCATION = {"map_location": torch.device("cpu")}
-
-    #mnet3_model.load_state_dict(checkpoint["state_dict"])
-    #mnet3_model = S2CellClassifierMnet3.load_from_checkpoint("checkpoints/s2cell_predict/version1.ckpt", num_classes=len(mapping))
 
     callbacks = []
-    if not args.fast_dev_run:
+    if args.mode == "train":
         callbacks.extend([
             FinetuningScheduler(
                 gen_ft_sched_only=args.gen_ft_sched_only,
@@ -159,6 +156,7 @@ def main():
                 verbose=True,
             ),
         ])
+
     callbacks.append(
         L.pytorch.callbacks.LearningRateMonitor(
             logging_interval="step"
@@ -184,13 +182,23 @@ def main():
         limit_val_batches=args.limit_batches,
         **fast_dev_run_args,
     )
-    trainer.fit(
-        model=mnet3_model,
-        train_dataloaders=train_dataloader,
-        val_dataloaders=val_dataloader,
-        ckpt_path=args.ckpt_path,
-    )
-    print("Training done")
+
+    if args.lr_finder:
+        tuner = lightning.pytorch.tuner.Tuner(trainer)
+        lr_finder = tuner.lr_find(
+            model=efn_model,
+            train_dataloaders=train_dataloader,
+            val_dataloaders=val_dataloader,
+        )
+        print(lr_finder.results)
+    else:
+        trainer.fit(
+            model=efn_model,
+            train_dataloaders=train_dataloader,
+            val_dataloaders=val_dataloader,
+            ckpt_path=args.ckpt_path,
+        )
+        print("Training done")
 
 
 if __name__ == "__main__":

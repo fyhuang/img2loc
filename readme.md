@@ -191,3 +191,30 @@ I re-read the PlaNet paper and realized that I misinterpreted the results tables
 The parenthesized numbers are apparently not the number of parameters in the model, as there is a separate table showing the # of parameters by number of classes.
 The actual number of parameters is ~4x higher than I thought.
 Next, I will try training on a larger base model.
+
+### Attempt #2 (EfficientNet-B5)
+
+EfficientNet-B5 (30M) more closely matches the # of parameters (29.1M for 2056 classes) from the original PlaNet paper.
+I also tweaked the fine-tuning configuration by adding [FinetuningScheduler](https://github.com/speediedan/finetuning-scheduler).
+This automates the process of freezing/unfreezing layers during finetuning.
+Some things are a bit rough around the edges (e.g. the fast_dev_run argument to Trainer no longer works), but overall it seems like an improvement over my original hacky finetuning setup.
+
+Training took X hours for a total cost of $Y on Lambda Cloud.
+
+Results from EfficientNet-based model:
+
+<table>
+<tr>
+    <th>Model</th>
+    <th>Street 1km</th>
+    <th>City 25km</th>
+    <th>Region 200km</th>
+    <th>Country 750km</th>
+    <th>Continent 2500km</th>
+</tr>
+<tr>
+    <td>EfficientNet (32.0M)</td>
+</tr>
+<tr>
+    <td>PlaNet (29.1M)</td>
+</tr>

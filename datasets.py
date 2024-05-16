@@ -13,7 +13,7 @@ def auto_batch_size():
     try:
         dev_name = torch.cuda.get_device_name(0)
         if dev_name == 'NVIDIA A10':
-            return 256
+            return 64
         else:
             print("Unknown device:", dev_name)
             return DEFAULT
