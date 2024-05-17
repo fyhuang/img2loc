@@ -40,16 +40,30 @@ class S2CellClassifierEfn(L.LightningModule):
 
         efn = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
 
+        # TODO: Change last layer to output more features (3072)
+        #features_layers = []
+        #for i, m in enumerate(efn.features):
+        #    if i != len(efn.features) - 1:
+        #        features_layers.append(m)
+        #lastconv_input_channels = efn.features[-1].in_channels
         self.features = efn.features
-        self.avgpool = efn.avgpool
+        #self.avgpool = nn.AdaptiveAvgPool2d((2, 2))
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
 
-        lastconv_output_channels = efn.classifier[1].in_features # 2048
+        # in_features = 2048
+        avgpool_out_features = \
+            efn.classifier[1].in_features * \
+                self.avgpool.output_size
+        hidden_size = 2048
         self.classifier = nn.Sequential(
+            nn.Linear(avgpool_out_features, hidden_size),
+            nn.SiLU(inplace=True),
             nn.Dropout(p=0.4, inplace=True),
-            nn.Linear(lastconv_output_channels, num_classes), # out is 1776
+            nn.Linear(hidden_size, num_classes), # out is 1776
         )
 
-        torch.nn.init.xavier_uniform_(self.classifier[1].weight)
+        # Example input array (for logging graph)
+        self.example_input_array = torch.zeros(1, 3, 224, 224, dtype=torch.float32)
 
         self.accuracy = torchmetrics.classification.Accuracy(task='multiclass', num_classes=num_classes)
 
@@ -147,10 +161,10 @@ def main():
     )
 
     callbacks = []
-    if args.mode == "train":
+    if args.mode in ["train", "overfit", "gen_ft_sched"]:
         callbacks.extend([
             FinetuningScheduler(
-                gen_ft_sched_only=args.gen_ft_sched_only,
+                gen_ft_sched_only=(args.mode == "gen_ft_sched"),
                 ft_schedule=FT_SCHEDULE_PATH,
             ),
             FTSCheckpoint(
@@ -167,11 +181,11 @@ def main():
             ),
         ])
 
-    callbacks.append(
+    callbacks.extend([
         L.pytorch.callbacks.LearningRateMonitor(
             logging_interval="step"
         ),
-    )
+    ])
 
     fast_dev_run_args = {}
     check_val_every_n_epoch = 1
@@ -194,6 +208,10 @@ def main():
         limit_train_batches=args.limit_batches,
         limit_val_batches=args.limit_batches,
         check_val_every_n_epoch=check_val_every_n_epoch,
+        logger=L.pytorch.loggers.TensorBoardLogger(
+            save_dir=".",
+            log_graph=True,
+        ),
         **fast_dev_run_args,
     )
 

@@ -1,6 +1,6 @@
 0:
   params:
-  - classifier.1.*
+  - classifier.*
   max_transition_epoch: 40
 1:
   params:
