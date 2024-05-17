@@ -6,16 +6,16 @@ import torchvision.transforms.v2 as T
 import webdataset as wds
 import pandas
 
-import label_mapping
+from mlutil import label_mapping
 
 def auto_batch_size():
-    DEFAULT = 2
+    DEFAULT = 16
     try:
         dev_name = torch.cuda.get_device_name(0)
         if dev_name == 'NVIDIA A10':
             return 64
         else:
-            print("Unknown device:", dev_name)
+            print("auto_batch_size: unknown device", dev_name)
             return DEFAULT
     except:
         return DEFAULT
@@ -47,6 +47,8 @@ VAL_T = T.Compose([
 class Im2gps2007:
     root = Path.home() / "datasets" / "im2gps"
     wds_root = root / "outputs" / "wds"
+
+    overfit_wds = Path.home() / "datasets" / "im2gps_overfit" / "wds"
     
     def __init__(self, s2cell_mapping_name="v1"):
         if s2cell_mapping_name == "v1":
@@ -119,6 +121,24 @@ class Im2gps2007:
             .map(self._to_img_latlng)\
             .batched(auto_batch_size())
         return wds.WebLoader(dataset, batch_size=None, num_workers=auto_dataloader_workers())
+
+    def overfit_dataloader_one(self, val=False):
+        ds = self.urls_to_dataset(
+            str(self.overfit_wds / "im2gps_overfit_one_000.tar"),
+            val=False,
+            shuffle=True,
+            load_img=True
+        )
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+
+    def overfit_dataloader_five(self, val=False):
+        ds = self.urls_to_dataset(
+            str(self.overfit_wds / "im2gps_overfit_one_000.tar"),
+            val=False,
+            shuffle=True,
+            load_img=True
+        )
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
 
 # im2gps test sets

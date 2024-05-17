@@ -1,11 +1,11 @@
 """
 Maps lat/lng to an s2cell ID/label from a set of s2 cells
 
->>> mapping = S2CellMapping([1234])
+>>> mapping = S2CellMapping(["8085"])
 >>> mapping.lat_lng_to_token(37.7953, -122.3939)
-''
->>> mapping.lat_lng_to_token()
-None
+'8085'
+>>> mapping.lat_lng_to_token(34.0561, -118.2364) is None
+True
 """
 
 import s2sphere

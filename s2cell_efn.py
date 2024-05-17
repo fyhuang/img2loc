@@ -23,7 +23,7 @@ import webdataset as wds
 import s2sphere
 import tqdm
 
-import label_mapping
+from mlutil import label_mapping
 from datasets import Im2gps2007
 
 
@@ -119,9 +119,10 @@ def main():
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["train", "fast_dev_run", "gen_ft_sched", "lr_find"],
+        choices=["train", "fast_dev_run", "gen_ft_sched", "lr_find", "overfit"],
         default="fast_dev_run",
     )
+    parser.add_argument("--overfit", choices=["1", "5"], default="1")
     #parser.add_argument("--fast_dev_run", action="store_true")
     #parser.add_argument("--gen_ft_sched_only", action="store_true")
     #parser.add_argument("--lr_finder", action="store_true")
@@ -129,11 +130,20 @@ def main():
     args = parser.parse_args()
 
     im2gps2007 = Im2gps2007()
-    train_dataloader = im2gps2007.train_dataloader()
-    val_dataloader = im2gps2007.val_dataloader()
+    if args.mode != "overfit":
+        train_dataloader = im2gps2007.train_dataloader()
+        val_dataloader = im2gps2007.val_dataloader()
+    else:
+        if args.overfit == "1":
+            train_dataloader = im2gps2007.overfit_dataloader_one()
+            val_dataloader = im2gps2007.overfit_dataloader_one(val=True)
+        elif args.overfit == "5":
+            train_dataloader = im2gps2007.overfit_dataloader_five()
+            val_dataloader = im2gps2007.overfit_dataloader_five(val=True)
+
     efn_model = S2CellClassifierEfn(
         num_classes=len(im2gps2007.mapping),
-        learning_rate=1e-3,
+        learning_rate=2e-3,
     )
 
     callbacks = []
@@ -164,7 +174,8 @@ def main():
     )
 
     fast_dev_run_args = {}
-    if args.fast_dev_run:
+    check_val_every_n_epoch = 1
+    if args.mode == "fast_dev_run":
         # FinetuningScheduler seems to fail if checkpointing/logging not enabled, so only keep the
         # flags that limit runtime
         fast_dev_run_args = {
@@ -172,18 +183,21 @@ def main():
             "max_steps": 1,
             "num_sanity_val_steps": 0,
             "val_check_interval": 1.0,
-            "check_val_every_n_epoch": 1,
         }
+        check_val_every_n_epoch = 1
+    elif args.mode == "overfit":
+        check_val_every_n_epoch = 10
 
     trainer = L.Trainer(
         accelerator=args.accelerator,
         callbacks=callbacks,
         limit_train_batches=args.limit_batches,
         limit_val_batches=args.limit_batches,
+        check_val_every_n_epoch=check_val_every_n_epoch,
         **fast_dev_run_args,
     )
 
-    if args.lr_finder:
+    if args.mode == "lr_finder":
         tuner = lightning.pytorch.tuner.Tuner(trainer)
         lr_finder = tuner.lr_find(
             model=efn_model,
