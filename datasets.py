@@ -98,6 +98,7 @@ class Im2gps2007:
                 .batched(auto_batch_size())
 
     def train_dataloader(self, shuffle=True, load_img=True):
+        # Total examples: 945k
         ds = self.urls_to_dataset(
             str(self.wds_root / "im2gps_2007_train_{000..028}.tar"),
             val=False,
@@ -107,6 +108,7 @@ class Im2gps2007:
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
     def val_dataloader(self, shuffle=True, load_img=True):
+        # Total examples: 236k
         val_dataset = self.urls_to_dataset(
             str(self.wds_root / "im2gps_2007_val_{000..007}.tar"),
             val=True,
@@ -133,7 +135,7 @@ class Im2gps2007:
 
     def overfit_dataloader_five(self, val=False):
         ds = self.urls_to_dataset(
-            str(self.overfit_wds / "im2gps_overfit_one_000.tar"),
+            str(self.overfit_wds / "im2gps_overfit_five_000.tar"),
             val=False,
             shuffle=True,
             load_img=True

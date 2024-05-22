@@ -58,7 +58,7 @@ class S2CellClassifierEfn(L.LightningModule):
         self.classifier = nn.Sequential(
             nn.Linear(avgpool_out_features, hidden_size),
             nn.SiLU(inplace=True),
-            nn.Dropout(p=0.4, inplace=True),
+            #nn.Dropout(p=0.4, inplace=True),
             nn.Linear(hidden_size, num_classes), # out is 1776
         )
 
@@ -112,14 +112,33 @@ class S2CellClassifierEfn(L.LightningModule):
         return self.forward(batch)
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+        optimizer = optim.AdamW(
+            self.parameters(),
+            lr=self.learning_rate,
+            weight_decay=0.0,
+        )
+
         return {
             "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer,
+                    mode="max",
+                    factor=0.99, # disable for this phase
+                    patience=40
+                ),
+                "monitor": "val_acc",
+                "interval": "epoch",
+                # TODO: this needs to be the same as check_val_every_n_epoch
+                "frequency": 3,
+            },
             #"lr_scheduler": {
-            #    "scheduler": optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="max", patience=3),
-            #    "monitor": "val_acc",
-            #    "interval": "epoch",
-            #    "frequency": 1,
+            #    "scheduler": optim.lr_scheduler.LinearLR(
+            #        optimizer,
+            #        start_factor=0.7,
+            #        end_factor=1.0,
+            #        total_iters=40,
+            #    ),
             #},
         }
 
@@ -137,9 +156,6 @@ def main():
         default="fast_dev_run",
     )
     parser.add_argument("--overfit", choices=["1", "5"], default="1")
-    #parser.add_argument("--fast_dev_run", action="store_true")
-    #parser.add_argument("--gen_ft_sched_only", action="store_true")
-    #parser.add_argument("--lr_finder", action="store_true")
 
     args = parser.parse_args()
 
@@ -154,38 +170,13 @@ def main():
         elif args.overfit == "5":
             train_dataloader = im2gps2007.overfit_dataloader_five()
             val_dataloader = im2gps2007.overfit_dataloader_five(val=True)
+        else:
+            raise NotImplementedError()
 
     efn_model = S2CellClassifierEfn(
         num_classes=len(im2gps2007.mapping),
-        learning_rate=2e-3,
+        learning_rate=1.5e-3,
     )
-
-    callbacks = []
-    if args.mode in ["train", "overfit", "gen_ft_sched"]:
-        callbacks.extend([
-            FinetuningScheduler(
-                gen_ft_sched_only=(args.mode == "gen_ft_sched"),
-                ft_schedule=FT_SCHEDULE_PATH,
-            ),
-            FTSCheckpoint(
-                monitor="val_acc",
-                mode="max",
-                save_last=True,
-                save_top_k=5,
-            ),
-            FTSEarlyStopping(
-                patience=5,
-                monitor="val_acc",
-                mode="max",
-                verbose=True,
-            ),
-        ])
-
-    callbacks.extend([
-        L.pytorch.callbacks.LearningRateMonitor(
-            logging_interval="step"
-        ),
-    ])
 
     fast_dev_run_args = {}
     check_val_every_n_epoch = 1
@@ -198,9 +189,37 @@ def main():
             "num_sanity_val_steps": 0,
             "val_check_interval": 1.0,
         }
-        check_val_every_n_epoch = 1
+        check_val_every_n_epoch = 2
     elif args.mode == "overfit":
-        check_val_every_n_epoch = 10
+        check_val_every_n_epoch = 3
+
+    val_acc_patience = 60 // check_val_every_n_epoch
+    callbacks = []
+    if args.mode in ["train", "overfit", "gen_ft_sched"]:
+        callbacks.extend([
+            FinetuningScheduler(
+                gen_ft_sched_only=(args.mode == "gen_ft_sched"),
+                ft_schedule=FT_SCHEDULE_PATH,
+            ),
+            FTSCheckpoint(
+                monitor="val_acc",
+                mode="max",
+                save_last=True,
+                save_top_k=3,
+            ),
+            FTSEarlyStopping(
+                patience=val_acc_patience,
+                monitor="val_acc",
+                mode="max",
+                verbose=True,
+            ),
+        ])
+
+    callbacks.extend([
+        L.pytorch.callbacks.LearningRateMonitor(
+            logging_interval="step"
+        ),
+    ])
 
     trainer = L.Trainer(
         accelerator=args.accelerator,
@@ -215,7 +234,7 @@ def main():
         **fast_dev_run_args,
     )
 
-    if args.mode == "lr_finder":
+    if args.mode == "lr_find":
         tuner = lightning.pytorch.tuner.Tuner(trainer)
         lr_finder = tuner.lr_find(
             model=efn_model,

@@ -160,8 +160,9 @@ What I intend to try next:
 * [x] Pick the learning rate with LR finder. (LR finder suggested same LR I was already using, 1e-3)
 * [x] Rewrite training script as plain old Python file (vscode Jupyter isn't too stable over SSH tunneling).
 * [x] Shuffle dataset before compilation.
-* [ ] Fine-tune the full model, not just final layers.
+* [x] Fine-tune the full model, not just final layers.
 * [ ] Increase size of dataset in worst-performing areas.
+* [ ] Reduce number of labels, try overfitting again.
 * [ ] Try multi-label classification, to see if learning the parent-child relationship of S2 cells helps.
 
 #### Error analysis
@@ -199,22 +200,25 @@ I also tweaked the fine-tuning configuration by adding [FinetuningScheduler](htt
 This automates the process of freezing/unfreezing layers during finetuning.
 Some things are a bit rough around the edges (e.g. the fast_dev_run argument to Trainer no longer works), but overall it seems like an improvement over my original hacky finetuning setup.
 
-Training took X hours for a total cost of $Y on Lambda Cloud.
+I first tried full fine-tuning on Lambda Cloud.
+Training took ~10 hours.
+Unfortunately, the results looked very poor, even worse than the MobileNet-based version.
+Accuracy on the validation set was very low, almost zero.
 
-Results from EfficientNet-based model:
+#### Debugging with overfitting
 
-<table>
-<tr>
-    <th>Model</th>
-    <th>Street 1km</th>
-    <th>City 25km</th>
-    <th>Region 200km</th>
-    <th>Country 750km</th>
-    <th>Continent 2500km</th>
-</tr>
-<tr>
-    <td>EfficientNet (32.0M)</td>
-</tr>
-<tr>
-    <td>PlaNet (29.1M)</td>
-</tr>
+To try to find out why, I tried debugging the model by creating a [smaller overfitting dataset](dataset/im2gps/im2gps_overfit.ipynb).
+There are two overfitting sets: one with exactly one image from each class (1776 images), and one with five images.
+
+On the first run, it became clear very quickly that the model was doing very poorly on the overfitting set.
+I used the exact same images in training and validation, and accuracy was about 3%.
+
+I tried to fix this by adding an extra hidden layer to the classifier head.
+This version got to around 80% accuracy on the overfitting (1) set.
+This was much better, but honestly still not as good as I expected for a model with 36M parameters.
+
+I then tried the overfitting (5) set.
+Encouragingly?
+
+Weird behavior when unfreezing all layers (test loss shoots up).
+Maybe need to adjust learning rate when unfreezing (lower learning rates seem to have made the jump smaller).
