@@ -18,7 +18,7 @@ import hmac
 import base64
 import urllib.parse
 import time
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 from pathlib import Path
 
 import pandas
@@ -54,7 +54,7 @@ class StreetViewDatasetCreator:
         return url_string + "&signature=" + encoded_signature.decode()
 
     def annotate_one(self, key, row):
-        while True:
+        for _ in range(10):
             # Call the Street View API to get the nearest panorama
             response = requests.get(self._sign_url(
                 "https://maps.googleapis.com/maps/api/streetview/metadata"
@@ -79,24 +79,28 @@ class StreetViewDatasetCreator:
             ):
                 raise _SvApiError(f"{sv_status}")
 
-            location = result.get("location", {})
-            sv_lat = (location.get("lat"))
-            sv_lng = (location.get("lng"))
-            sv_pano = (result.get("pano_id"))
+            break
+        else:
+            print(f"Failed to get a valid response: {row.lat}, {row.lng}")
 
-            return _SvResult(
-                key=key,
-                status=sv_status,
-                lat=sv_lat,
-                lng=sv_lng,
-                pano_id=sv_pano,
-            )
+        location = result.get("location", {})
+        sv_lat = (location.get("lat"))
+        sv_lng = (location.get("lng"))
+        sv_pano = (result.get("pano_id"))
+
+        return _SvResult(
+            key=key,
+            status=sv_status,
+            lat=sv_lat,
+            lng=sv_lng,
+            pano_id=sv_pano,
+        )
 
     def annotate(
             self,
             raw_df,
             # Street View allows 30k QPM == 500 QPS. 250 QPS is 1/2 of that.
-            rate_limit=250.0,
+            rate_limit=100.0,
             ):
 
         out_df = raw_df.rename(
@@ -149,14 +153,14 @@ class StreetViewDatasetCreator:
 
     # Parameterize a SV dataframe
     def parameterize_random_heading(self, sv_df):
-        out_df = sv_df.copy()
+        out_df = sv_df.drop_duplicates()
         out_df = out_df.query("status == 'OK'")
 
         out_df['fov'] = 45
         out_df['pitch'] = 0
 
         # Randomize the heading
-        out_df['heading'] = numpy.random.randint(0, 360, len(sv_df))
+        out_df['heading'] = numpy.random.randint(0, 360, len(out_df))
 
         # Generate a path to save each image to
         paths = []
@@ -191,34 +195,58 @@ class StreetViewDatasetCreator:
         return pandas.DataFrame(out_columns)
 
     # Do all steps, saving intermediate results to disk
-    def transform_files(self, df_dir):
+    def transform_files(self, df_dir, rows_to_annotate: Optional[int]):
         # Do all stages
         df_dir = Path(df_dir)
         raw_df = pandas.read_pickle(df_dir / "s1_raw.pkl")
 
+        #prev_ann_df = None
+        #ann_df_path = df_dir / "s2_annotated.pkl"
+        #if ann_df_path.is_file():
+        #    prev_ann_df = pandas.read_pickle(ann_df_path)
+
+        #    # Exclude already processed rows
+        #    unprocessed = (prev_ann_df['status'] != "OK") & (prev_ann_df['status'] != "ZERO_RESULTS")
+        #    if len(unprocessed) < len(raw_df):
+        #        unprocessed = pandas.concat([unprocessed, pandas.Series([True] * (len(raw_df) - len(unprocessed)))], ignore_index=True)
+        #    unprocessed = unprocessed.head(len(raw_df))
+        #    raw_df = raw_df.loc[unprocessed]
+        #    print(f"Not yet processed: {len(raw_df)} rows")
+
+        ## Limit the number of rows to process
+        #if rows_to_process is not None:
+        #    raw_df = raw_df.head(rows_to_process)
+        #    print(f"Processing {len(raw_df)} rows")
+
+        #if len(raw_df) == 0:
+        #    print("Nothing to annotate!")
+        #else:
+        #    print("Annotating")
+        #    ann_df = self.annotate(raw_df)
+        #    if prev_ann_df is not None:
+        #        ann_df = pandas.concat([prev_ann_df, ann_df])
+        #    ann_df.to_pickle(ann_df_path)
+
+        # TODO: how to combine this with incremental annotation?
         ann_df_path = df_dir / "s2_annotated.pkl"
         if ann_df_path.is_file():
             ann_df = pandas.read_pickle(ann_df_path)
+
+        param_df_path = df_dir / "s3_parameterized.pkl"
+        if param_df_path.is_file():
+            param_df = pandas.read_pickle(param_df_path)
         else:
             print("Parameterizing")
-            ann_df = self.annotate(raw_df)
-            ann_df.to_pickle(ann_df_path)
+            param_df = self.parameterize_random_heading(ann_df)
+            param_df.to_pickle(param_df_path)
 
-        #param_df_path = df_dir / "s3_parameterized.pkl"
-        #if param_df_path.is_file():
-        #    param_df = pandas.read_pickle(param_df_path)
-        #else:
-        #    print("Parameterizing")
-        #    param_df = creator.parameterize_random_heading(ann_df)
-        #    param_df.to_pickle(param_df_path)
-
-        #urls_paths_df_path = df_dir / "_urls_paths.pkl"
-        #if urls_paths_df_path.is_file():
-        #    urls_paths_df = pandas.read_pickle(urls_paths_df_path)
-        #else:
-        #    print("Generating URLs")
-        #    urls_paths_df = creator.generate_urls_paths(param_df)
-        #    urls_paths_df.to_pickle(urls_paths_df_path)
+        urls_paths_df_path = df_dir / "_urls_paths.pkl"
+        if urls_paths_df_path.is_file():
+            urls_paths_df = pandas.read_pickle(urls_paths_df_path)
+        else:
+            print("Generating URLs")
+            urls_paths_df = self.generate_urls_paths(param_df)
+            urls_paths_df.to_pickle(urls_paths_df_path)
 
 
 def main():
@@ -228,6 +256,7 @@ def main():
     parser.add_argument("--api_key_path", type=str, required=True, help="Google Maps API key")
     parser.add_argument("--sign_secret_path", type=str, required=True, help="Google Maps API signing secret")
     parser.add_argument("--df_dir", type=str, required=True, help="Directory with dataframes")
+    parser.add_argument("--rows_to_annotate", type=int, help="Limit the number of rows to annotate")
     args = parser.parse_args()
 
     with open(args.api_key_path) as f:
@@ -238,7 +267,7 @@ def main():
     creator = StreetViewDatasetCreator(api_key, sign_secret)
 
     # Do all stages
-    creator.transform_files(args.df_dir)
+    creator.transform_files(args.df_dir, args.rows_to_annotate)
 
 if __name__ == "__main__":
     main()
