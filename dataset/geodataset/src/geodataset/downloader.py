@@ -2,6 +2,7 @@
 """
 
 import argparse
+import collections
 from pathlib import Path
 
 import requests
@@ -38,11 +39,11 @@ class Downloader:
                     f.write(chunk)
 
     def download_all(self, df, rate_limit):
-        parallel = rate_limited_parallel.RateLimitedExecutor(rate_limit)
+        parallel = rate_limited_parallel.RateLimitedExecutor(rate_limit, max_workers=16)
 
         try:
             futures = []
-            for row in tqdm.tqdm(df.itertuples()):
+            for row in tqdm.tqdm(df.itertuples(), total=len(df), desc="Submitting futures"):
                 out_path = self.prepare_download(row)
                 if out_path is None:
                     # Already downloaded, skip
@@ -50,8 +51,31 @@ class Downloader:
                 futures.append(parallel.submit(self.download_one, out_path, row.url))
 
             print("Submitted all futures")
-            for future in tqdm.tqdm(futures):
-                future.result()
+
+            failed_status_codes = collections.defaultdict(int)
+            for future in tqdm.tqdm(futures, desc="Downloading"):
+                try:
+                    future.result()
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code in (
+                        404,
+                        # Image no longer exists
+                        410,
+                        500,
+                        # Bad gateway
+                        502,
+                        503,
+                        504,
+                    ):
+                        failed_status_codes[e.response.status_code] += 1
+                        continue
+                    raise
+
+            print("Done")
+            if len(failed_status_codes) > 0:
+                print("Failed to download:")
+                for status_code, count in failed_status_codes.items():
+                    print(f"  HTTP {status_code}: {count}")
         finally:
             parallel.shutdown()
         

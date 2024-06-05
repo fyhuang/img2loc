@@ -170,7 +170,7 @@ class Im2GpsDatasetCreator:
     def assemble(self, query_results_path: Path):
         # Assemble all the results into a single dataframe
         dataset_df = pandas.DataFrame()
-        for qt in self.all_queries:
+        for qt in tqdm.tqdm(self.all_queries, desc="Assembling"):
             out_path = query_results_path / f"{qt.tag}.pkl"
             if out_path.exists():
                 query_df = pandas.read_pickle(out_path)
@@ -182,7 +182,30 @@ class Im2GpsDatasetCreator:
                 print(f"No file {out_path}")
 
         dataset_df.drop_duplicates(subset=["id", "owner", "secret", "server"], inplace=True)
+
+        # Write img_path for each row
+        img_paths = []
+        for row in tqdm.tqdm(dataset_df.itertuples(), total=len(dataset_df.index), desc="Writing img_paths"):
+            row_subdir = "{}/{:05d}".format(row.tag, row.Index//1000)
+            row_filename_stem = f"{row.id}_{row.secret}_{row.server}_{row.owner}"
+            img_paths.append(f"{row_subdir}/{row_filename_stem}.jpg")
+
+        dataset_df["img_path"] = img_paths
         return dataset_df.sample(frac=1)
+
+    def generate_urls_paths(self, in_df):
+        out_columns = {"img_path": [], "url": []}
+
+        for row in tqdm.tqdm(
+                in_df.itertuples(),
+                total=len(in_df),
+                desc="Generating URLs",
+            ):
+            url = f"https://live.staticflickr.com/{row.server}/{row.id}_{row.secret}_z.jpg"
+            out_columns["img_path"].append(row.img_path)
+            out_columns["url"].append(url)
+
+        return pandas.DataFrame(out_columns)
 
 
 def main() -> None:
@@ -214,7 +237,10 @@ def main() -> None:
     creator.query_all(Path(args.results_path))
 
     # TODO(fyhuang): specify the filename
-    creator.assemble(Path(args.results_path)).to_pickle("all.pkl")
+    dataset_df = creator.assemble(Path(args.results_path))
+    dataset_df.to_pickle("all.pkl")
+
+    creator.generate_urls_paths(dataset_df).to_pickle("_urls_paths.pkl")
 
 if __name__ == "__main__":
     main()

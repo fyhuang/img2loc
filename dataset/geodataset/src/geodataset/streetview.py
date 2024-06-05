@@ -165,6 +165,7 @@ class StreetViewDatasetCreator:
         # Generate a path to save each image to
         paths = []
         for row in tqdm.tqdm(out_df.itertuples()):
+            # TODO(fyhuang): use subdirectories
             paths.append(f"sv_{row.pano_id}.jpg")
         out_df['img_path'] = paths
 
