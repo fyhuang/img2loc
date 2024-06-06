@@ -6,7 +6,7 @@ import torchvision.transforms.v2 as T
 import webdataset as wds
 import pandas
 
-from mlutil import label_mapping
+from mlutil import label_mapping, s2cell_mapping
 
 def auto_batch_size():
     DEFAULT = 16
@@ -143,6 +143,69 @@ class Im2gps2007:
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
 
+class World1:
+    root = Path.home() / "datasets/img2loc"
+    wds_root = root / "outputs/wds"
+
+    overfit_wds = Path.home() / "datasets/im2gps_overfit/wds"
+    
+    def __init__(self, s2cell_mapping_name="s2cell_930_ml"):
+        self.label_mapping = label_mapping.LabelMapping.read_csv(self.root / f"outputs/world1/{s2cell_mapping_name}.csv")
+        self.s2cell_mapping = s2cell_mapping.S2CellMapping.from_label_mapping(self.label_mapping)
+
+    def _meta_to_label_tensor(self, meta):
+        # Compute the label for multi class classification
+        single_token = self.s2cell_mapping.lat_lng_to_token(meta["latitude"], meta["longitude"])
+        if single_token is None:
+            return None
+        single_label = self.label_mapping.get_label(single_token)
+
+        # Compute the label for multilabel classification
+        multihot_list = self.s2cell_mapping.lat_lng_to_multihot_list(meta["latitude"], meta["longitude"])
+
+        label_tensor = torch.cat((
+            torch.tensor([meta["latitude"], meta["longitude"]]),
+            torch.tensor([single_label]),
+            torch.tensor(multihot_list),
+        ))
+
+        return label_tensor
+
+    def _make_to_img_label(self, val=True):
+        def to_img_label(sample):
+            img, meta = sample
+            if val:
+                return VAL_T(img), self._meta_to_label_tensor(meta)
+            return TRAIN_T(img), self._meta_to_label_tensor(meta)
+        return to_img_label
+
+    def _to_label_only(self, sample):
+        img, meta = sample
+        return 0, self._meta_to_label_tensor(meta)
+
+    def urls_to_dataset(self, urls, val, shuffle, load_img):
+        ds = wds.WebDataset(urls, shardshuffle=shuffle)
+        if shuffle:
+            ds = ds.shuffle(100)
+        if load_img:
+            return ds.decode("pil").to_tuple("jpg", "json")\
+                .map(self._make_to_img_label(val))\
+                .batched(auto_batch_size())
+        else:
+            return ds.decode(only="json").to_tuple("jpg", "json")\
+                .map(self._to_label_only)\
+                .batched(auto_batch_size())
+
+    def overfit_dataloader_one(self, val=False):
+        ds = self.urls_to_dataset(
+            str(self.overfit_wds / "world1_overfit_one_000.tar"),
+            val=val,
+            shuffle=True,
+            load_img=True
+        )
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+
+
 # im2gps test sets
 class Im2gpsTest:
     root_3k = Path.home() / "datasets" / "im2gps3ktest"
@@ -158,15 +221,19 @@ class Im2gpsTest:
 
 if __name__ == "__main__":
     # Test datasets
-    for inputs, targets in Im2gps2007("v1").train_dataloader():
-        print(inputs.shape, targets.shape)
-        break
-    for inputs, targets in Im2gps2007("v1").val_dataloader():
-        print(inputs.shape, targets.shape)
-        break
-    for inputs, targets in Im2gps2007("v1").val_dataloader_latlng():
-        print(inputs.shape, targets.shape)
-        break
-    for inputs, targets in Im2gpsTest.test_dataloader_3k():
-        print(inputs.shape, targets.shape)
+    #for inputs, targets in Im2gps2007("v1").train_dataloader():
+    #    print("Im2gps2007::train", inputs.shape, targets.shape)
+    #    break
+    #for inputs, targets in Im2gps2007("v1").val_dataloader():
+    #    print("Im2gps2007::val", inputs.shape, targets.shape)
+    #    break
+    #for inputs, targets in Im2gps2007("v1").val_dataloader_latlng():
+    #    print("Im2gps2007::val_ll", inputs.shape, targets.shape)
+    #    break
+    #for inputs, targets in Im2gpsTest.test_dataloader_3k():
+    #    print("Im2gpsTest", inputs.shape, targets.shape)
+    #    break
+    for inputs, targets in World1().overfit_dataloader_one():
+        print("World1::overfit_one", inputs.shape, targets.shape)
+        print("World1::overfit_one", targets)
         break
