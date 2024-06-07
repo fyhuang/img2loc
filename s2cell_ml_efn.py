@@ -7,6 +7,7 @@ import math
 import multiprocessing
 import heapq
 import dataclasses
+import collections
 
 import torchvision.models as models
 import torch
@@ -27,7 +28,7 @@ import webdataset as wds
 import s2sphere
 import tqdm
 
-from mlutil import label_mapping
+from mlutil import label_mapping, s2cell_mapping, geoguessr_score
 from datasets import World1
 
 
@@ -36,8 +37,12 @@ FT_SCHEDULE_PATH = "finetune_s2cell_efn.yaml"
 
 # Define a LightningModule for the classifier
 class S2CellClassifierEfn(L.LightningModule):
-    def __init__(self, num_classes):
+    def __init__(self, label_mapping):
         super().__init__()
+
+        self.label_mapping = label_mapping
+        self.s2cell_mapping = s2cell_mapping.S2CellMapping.from_label_mapping(label_mapping)
+        num_classes = len(label_mapping)
 
         efn = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
 
@@ -62,6 +67,7 @@ class S2CellClassifierEfn(L.LightningModule):
 
         self.subset_accuracy = torchmetrics.classification.MultilabelExactMatch(num_labels=num_classes)
         self.f1_score = torchmetrics.classification.MultilabelF1Score(num_labels=num_classes)
+        self.geo_score = geoguessr_score.GeoguessrScore()
 
     def forward(self, x):
         x = self.features(x)
@@ -69,6 +75,28 @@ class S2CellClassifierEfn(L.LightningModule):
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
+
+    def logits_to_latlng(self, z):
+        # Pick the best S2 cell from model's output and convert to lat/lng
+
+        assert z.shape[1] == len(self.label_mapping)
+
+        # Convert all output labels
+        preds = z > 0.5
+        pred_ll = torch.zeros((z.shape[0], 2), dtype=torch.float32, device=z.device)
+
+        for row_num in range(z.shape[0]):
+            tokens = [self.label_mapping.get_name(i) for i in range(len(self.label_mapping)) if preds[row_num, i]]
+            if len(tokens) == 0:
+                # No prediction
+                continue
+            best_cell_id = self.s2cell_mapping.token_list_to_prediction(tokens)
+            lat_lng = best_cell_id.to_lat_lng()
+            pred_ll[row_num, 0] = lat_lng.lat().degrees
+            pred_ll[row_num, 1] = lat_lng.lng().degrees
+
+        return pred_ll
+
 
     def _infer_with_loss_acc(self, x, targets, log_name_prefix, log_step=True):
         # extract ML labels from targets
@@ -86,7 +114,14 @@ class S2CellClassifierEfn(L.LightningModule):
         self.log(f"{log_name_prefix}_acc{log_name_suffix}", self.subset_accuracy, prog_bar=True, on_step=log_step, on_epoch=(not log_step))
 
         self.f1_score(z, y)
-        self.log(f"{log_name_prefix}_f1{log_name_suffix}", self.f1_score, prog_bar=True, on_step=log_step, on_epoch=(not log_step))
+        self.log(f"{log_name_prefix}_f1{log_name_suffix}", self.f1_score, on_step=log_step, on_epoch=(not log_step))
+
+        # Compute geoguessr score from target lat/lng
+        if log_name_prefix == "val":
+            target_ll = targets[:, :2]
+            pred_ll = self.logits_to_latlng(z)
+            self.geo_score(pred_ll, target_ll)
+            self.log(f"{log_name_prefix}_geo{log_name_suffix}", self.geo_score, on_step=log_step, on_epoch=(not log_step))
 
         return loss, z
 
@@ -123,14 +158,6 @@ class S2CellClassifierEfn(L.LightningModule):
                 # TODO: this needs to be the same as check_val_every_n_epoch
                 "frequency": 3,
             },
-            #"lr_scheduler": {
-            #    "scheduler": optim.lr_scheduler.LinearLR(
-            #        optimizer,
-            #        start_factor=0.7,
-            #        end_factor=1.0,
-            #        total_iters=40,
-            #    ),
-            #},
         }
 
 
@@ -158,11 +185,14 @@ def main():
         if args.overfit == "1":
             train_dataloader = world1.overfit_dataloader_one()
             val_dataloader = world1.overfit_dataloader_one(val=True)
+        elif args.overfit == "5":
+            train_dataloader = world1.overfit_dataloader_five()
+            val_dataloader = world1.overfit_dataloader_five(val=True)
         else:
             raise NotImplementedError()
 
     efn_model = S2CellClassifierEfn(
-        num_classes=len(world1.label_mapping),
+        label_mapping=world1.label_mapping,
     )
 
     fast_dev_run_args = {}

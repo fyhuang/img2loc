@@ -205,6 +205,15 @@ class World1:
         )
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
+    def overfit_dataloader_five(self, val=False):
+        ds = self.urls_to_dataset(
+            str(self.overfit_wds / "world1_overfit_five_000.tar"),
+            val=val,
+            shuffle=True,
+            load_img=True
+        )
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+
 
 # im2gps test sets
 class Im2gpsTest:

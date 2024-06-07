@@ -161,9 +161,9 @@ What I intend to try next:
 * [x] Rewrite training script as plain old Python file (vscode Jupyter isn't too stable over SSH tunneling).
 * [x] Shuffle dataset before compilation.
 * [x] Fine-tune the full model, not just final layers.
-* [ ] Increase size of dataset in worst-performing areas.
-* [ ] Reduce number of labels, try overfitting again.
-* [ ] Try multi-label classification, to see if learning the parent-child relationship of S2 cells helps.
+* [x] Increase size of dataset in worst-performing areas.
+* [x] Reduce number of labels, try overfitting again.
+* [x] Try multi-label classification, to see if learning the parent-child relationship of S2 cells helps.
 
 #### Error analysis
 
@@ -222,3 +222,16 @@ Encouragingly?
 
 Weird behavior when unfreezing all layers (test loss shoots up).
 Maybe need to adjust learning rate when unfreezing (lower learning rates seem to have made the jump smaller).
+
+### Attempt #3 (EfficientNet with multilabel)
+
+Changes:
+
+* Multilabel classification
+* Larger dataset
+* Fewer classes -- more examples per class
+* Includes some high quality data from Street View
+
+To do:
+
+- [ ] Debug the GeoGuessr score implementation

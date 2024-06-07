@@ -1,7 +1,7 @@
 """
 Maps lat/lng to an s2cell ID/label from a set of s2 cells
 
->>> import label_mapping
+>>> from . import label_mapping
 >>> mapping = S2CellMapping(label_mapping.LabelMapping([
 ...     "8085", "8085c", "80859", "808584", # San Francisco
 ...     "89c3", "89c24", "89c25", "89c25c", # New York
@@ -14,7 +14,24 @@ True
 [1, 1, 1, 1, 0, 0, 0, 0]
 >>> mapping.lat_lng_to_multihot_list(37.9720, -122.5226)
 [1, 1, 1, 0, 0, 0, 0, 0]
+
+
+The mapping can also convert from a predicted token list (multi-label)
+to a single predicted CellId.
+
+>>> from . import label_mapping
+>>> mapping = S2CellMapping(label_mapping.LabelMapping([
+...     "8085", "8085c", "80859", "808584", # San Francisco
+...     "89c3", "89c24", "89c25", "89c25c", # New York
+... ]))
+>>> mapping.token_list_to_prediction(["8085", "8085c", "80859", "808584"]).to_token()
+'808584'
+>>> # 89c25c (NYC) is not congruent with the rest (SF)
+>>> mapping.token_list_to_prediction(["8085", "8085c", "80859", "89c25c"]).to_token()
+'80859'
 """
+
+import collections
 
 import s2sphere
 
@@ -68,6 +85,23 @@ class S2CellMapping:
                 label_list[self.label_mapping.get_label(s2_cell_id.to_token())] = 1
             s2_cell_id = s2_cell_id.parent()
         return label_list
+
+    def token_list_to_prediction(self, token_list):
+        cell_ids = [s2sphere.CellId.from_token(token) for token in token_list]
+        cell_id_set = set(c.id() for c in cell_ids)
+
+        # The best cell is the one that has the most ancestors in the prediction set
+        # In the case of a tie, we pick the cell with the lowest level (to reflect uncertainty)
+        cell_id_to_parents = collections.defaultdict(int)
+        for cell_id in cell_ids:
+            query = cell_id.parent()
+            while query.level() >= self.min_cell_level:
+                if query.id() in cell_id_set:
+                    cell_id_to_parents[cell_id] += 1
+                query = query.parent()
+
+        best_cell_id = max(cell_ids, key=lambda x: (cell_id_to_parents[x], -x.level()))
+        return best_cell_id
 
 
 if __name__ == "__main__":
