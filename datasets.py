@@ -1,4 +1,5 @@
 from pathlib import Path
+from braceexpand import braceexpand
 import multiprocessing
 
 import torch
@@ -23,6 +24,18 @@ def auto_batch_size():
 def auto_dataloader_workers():
     return (multiprocessing.cpu_count() - 1)
 
+def auto_shuffle_size():
+    DEFAULT = 1000
+    try:
+        dev_name = torch.cuda.get_device_name(0)
+        if dev_name == 'NVIDIA A10':
+            return 100_000
+        else:
+            print("auto_batch_size: unknown device", dev_name)
+            return DEFAULT
+    except:
+        return DEFAULT
+
 NORMALIZE_T = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 UNNORMALIZE_T = T.Normalize(mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225], std=[1/0.229, 1/0.224, 1/0.225])
 
@@ -43,46 +56,96 @@ VAL_T = T.Compose([
 ])
 
 
+class _GeoDatasetTransformer:
+    def __init__(self, label_mapping, s2cell_mapping):
+        self.label_mapping = label_mapping
+        self.s2cell_mapping = s2cell_mapping
+
+    def meta_to_label_tensor(self, meta):
+        # Compute the label for multi class classification
+        single_token = self.s2cell_mapping.lat_lng_to_token(meta["latitude"], meta["longitude"])
+        if single_token is None:
+            return None
+        single_label = self.label_mapping.get_label(single_token)
+
+        # Compute the label for multilabel classification
+        multihot_list = self.s2cell_mapping.lat_lng_to_multihot_list(meta["latitude"], meta["longitude"])
+
+        label_tensor = torch.cat((
+            torch.tensor([meta["latitude"], meta["longitude"]]),
+            torch.tensor([single_label]),
+            torch.tensor(multihot_list),
+        ))
+
+        return label_tensor
+
+    def make_to_img_label(self, val=True):
+        def to_img_label(sample):
+            img, meta = sample
+            transformed_img = VAL_T(img) if val else TRAIN_T(img)
+            labels = self.meta_to_label_tensor(meta)
+            if labels is None:
+                return None
+            return transformed_img, labels
+        return to_img_label
+
+    def to_label_only(self, sample):
+        img, meta = sample
+        return 0, self.meta_to_label_tensor(meta)
+
+
+def urls_to_dataset(urls, transformer, val, shuffle, load_img):
+    if type(urls) == list:
+        # Do manual brace expansion
+        expanded_urls = []
+        for url_template in urls:
+            expanded_urls.extend(braceexpand(url_template))
+        urls = expanded_urls
+
+    ds = wds.WebDataset(urls, shardshuffle=shuffle)
+    if shuffle:
+        ds = ds.shuffle(auto_shuffle_size())
+    if load_img:
+        return ds.decode("pil").to_tuple("jpg", "json")\
+            .map(transformer.make_to_img_label(val))\
+            .batched(auto_batch_size())
+    else:
+        return ds.decode(only="json").to_tuple("jpg", "json")\
+            .map(transformer.to_label_only)\
+            .batched(auto_batch_size())
+
+
+
+
 # im2gps 2007 dataset
 class Im2gps2007:
-    root = Path.home() / "datasets" / "im2gps"
-    wds_root = root / "outputs" / "wds"
+    root = Path.home() / "datasets/img2loc"
+    wds_root = root / "im2gps_2007"
 
     overfit_wds = Path.home() / "datasets" / "im2gps_overfit" / "wds"
     
-    def __init__(self, s2cell_mapping_name="v1"):
+    def __init__(self, s2cell_mapping_name="v2"):
         if s2cell_mapping_name == "v1":
             self.mapping = label_mapping.LabelMapping.read_csv(self.root / "outputs" / "s2cell_2007" / "cells.csv")
             self.annotated_df = pandas.read_pickle(self.root / "outputs" / "s2cell_2007" / "annotated.pkl")
             self.image_id_to_s2cell = {row.id: row.s2cell for row in self.annotated_df.itertuples()}
+        elif s2cell_mapping_name == "v2":
+            self.mapping = label_mapping.LabelMapping.read_csv(self.root / "s2cell_930_ml.csv")
+            self.transformer = _GeoDatasetTransformer(self.mapping, s2cell_mapping.S2CellMapping.from_label_mapping(self.mapping))
         else:
             raise NotImplementedError()
-
-    @staticmethod
-    def _to_img_latlng(sample):
-        img, meta = sample
-        label = torch.tensor([meta["latitude"], meta["longitude"]])
-        return VAL_T(img), label
 
     def _make_to_img_label(self, val=True):
         def to_img_label(sample):
             img, meta = sample
-            s2cell = self.image_id_to_s2cell.get(meta["id"])
-            if s2cell is None:
-                return None
-            label = self.mapping.get_label(s2cell)
             if val:
-                return VAL_T(img), label
-            return TRAIN_T(img), label
+                return VAL_T(img), self.transformer.meta_to_label_tensor(meta)
+            return TRAIN_T(img), self.transformer.meta_to_label_tensor(meta)
         return to_img_label
 
     def _to_label_only(self, sample):
         img, meta = sample
-        s2cell = self.image_id_to_s2cell.get(meta["id"])
-        if s2cell is None:
-            return None
-        label = self.mapping.get_label(s2cell)
-        return 0, label
+        return 0, self.transformer.meta_to_label_tensor(meta)
 
     def urls_to_dataset(self, urls, val, shuffle, load_img):
         ds = wds.WebDataset(urls, shardshuffle=shuffle)
@@ -97,18 +160,21 @@ class Im2gps2007:
                 .map(self._to_label_only)\
                 .batched(auto_batch_size())
 
-    def train_dataloader(self, shuffle=True, load_img=True):
-        # Total examples: 945k
-        ds = self.urls_to_dataset(
+    def train_dataset(self, shuffle=True, load_img=True):
+        # Total examples: 472k
+        return self.urls_to_dataset(
             str(self.wds_root / "im2gps_2007_train_{000..028}.tar"),
             val=False,
             shuffle=shuffle,
             load_img=load_img,
         )
+    
+    def train_dataloader(self, *args, **kwargs):
+        ds = self.train_dataset(*args, **kwargs)
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
-    def val_dataloader(self, shuffle=True, load_img=True):
-        # Total examples: 236k
+    def val_dataset(self, shuffle=True, load_img=True):
+        # Total examples: 118k
         val_dataset = self.urls_to_dataset(
             str(self.wds_root / "im2gps_2007_val_{000..007}.tar"),
             val=True,
@@ -116,6 +182,10 @@ class Im2gps2007:
             load_img=load_img,
         )
         return wds.WebLoader(val_dataset, batch_size=None, num_workers=auto_dataloader_workers())
+
+    def val_dataloader(self, *args, **kwargs):
+        ds = self.val_dataset(*args, **kwargs)
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
     def val_dataloader_latlng(self):
         dataset = wds.WebDataset(str(self.wds_root / "im2gps_2007_val_{000..007}.tar"))
@@ -145,73 +215,86 @@ class Im2gps2007:
 
 class World1:
     root = Path.home() / "datasets/img2loc"
-    wds_root = root / "outputs/wds"
+    wds_root = root / "world1"
 
-    overfit_wds = Path.home() / "datasets/im2gps_overfit/wds"
+    overfit_wds = root / "world1_overfit"
     
     def __init__(self, s2cell_mapping_name="s2cell_930_ml"):
-        self.label_mapping = label_mapping.LabelMapping.read_csv(self.root / f"outputs/world1/{s2cell_mapping_name}.csv")
+        self.label_mapping = label_mapping.LabelMapping.read_csv(self.root / f"{s2cell_mapping_name}.csv")
         self.s2cell_mapping = s2cell_mapping.S2CellMapping.from_label_mapping(self.label_mapping)
 
-    def _meta_to_label_tensor(self, meta):
-        # Compute the label for multi class classification
-        single_token = self.s2cell_mapping.lat_lng_to_token(meta["latitude"], meta["longitude"])
-        if single_token is None:
-            return None
-        single_label = self.label_mapping.get_label(single_token)
+        self.transformer = _GeoDatasetTransformer(self.label_mapping, self.s2cell_mapping)
 
-        # Compute the label for multilabel classification
-        multihot_list = self.s2cell_mapping.lat_lng_to_multihot_list(meta["latitude"], meta["longitude"])
+    def train_dataset(self, shuffle=True, load_img=True):
+        # Total examples: 40k
+        return urls_to_dataset(
+            [str(self.wds_root / "world1_{000..001}.tar")] * 3,
+            self.transformer,
+            val=False,
+            shuffle=shuffle,
+            load_img=load_img,
+        )
 
-        label_tensor = torch.cat((
-            torch.tensor([meta["latitude"], meta["longitude"]]),
-            torch.tensor([single_label]),
-            torch.tensor(multihot_list),
-        ))
+    def train_dataloader(self, *args, **kwargs):
+        ds = self.train_dataset(*args, **kwargs)
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
-        return label_tensor
-
-    def _make_to_img_label(self, val=True):
-        def to_img_label(sample):
-            img, meta = sample
-            if val:
-                return VAL_T(img), self._meta_to_label_tensor(meta)
-            return TRAIN_T(img), self._meta_to_label_tensor(meta)
-        return to_img_label
-
-    def _to_label_only(self, sample):
-        img, meta = sample
-        return 0, self._meta_to_label_tensor(meta)
-
-    def urls_to_dataset(self, urls, val, shuffle, load_img):
-        ds = wds.WebDataset(urls, shardshuffle=shuffle)
-        if shuffle:
-            ds = ds.shuffle(100)
-        if load_img:
-            return ds.decode("pil").to_tuple("jpg", "json")\
-                .map(self._make_to_img_label(val))\
-                .batched(auto_batch_size())
-        else:
-            return ds.decode(only="json").to_tuple("jpg", "json")\
-                .map(self._to_label_only)\
-                .batched(auto_batch_size())
-
-    def overfit_dataloader_one(self, val=False):
-        ds = self.urls_to_dataset(
-            str(self.overfit_wds / "world1_overfit_one_000.tar"),
+    def overfit_dataloader_one(self, train_repeat=3, val=False):
+        urls = [str(self.overfit_wds / "world1_overfit_one_000.tar")]
+        if not val:
+            urls = urls * train_repeat
+        ds = urls_to_dataset(
+            urls,
+            self.transformer,
             val=val,
             shuffle=True,
             load_img=True
         )
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
-    def overfit_dataloader_five(self, val=False):
-        ds = self.urls_to_dataset(
-            str(self.overfit_wds / "world1_overfit_five_000.tar"),
+    def overfit_dataloader_five(self, train_repeat=3, val=False):
+        urls = [str(self.overfit_wds / "world1_overfit_five_000.tar")]
+        if not val:
+            urls = urls * train_repeat
+        ds = urls_to_dataset(
+            urls,
+            self.transformer,
             val=val,
             shuffle=True,
             load_img=True
         )
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+
+
+class Img2LocCombined:
+    """Combined dataset of im2gps 2007, 2023, and world1"""
+    root = Path.home() / "datasets/img2loc"
+
+    def __init__(self, s2cell_mapping_name="s2cell_930_ml"):
+        mapping = label_mapping.LabelMapping.read_csv(self.root / f"{s2cell_mapping_name}.csv")
+        self.transformer = _GeoDatasetTransformer(mapping, s2cell_mapping.S2CellMapping.from_label_mapping(mapping))
+
+    def train_dataloader(self):
+        # Total is ~1.8m examples
+        urls = [
+            # im2gps 2007 is ~591k examples
+            str(self.root / "im2gps_2007/im2gps_2007_train_{000..028}.tar"),
+            # im2gps 2023 is ~1.05m examples
+            str(self.root / "im2gps_2023/im2gps_2023_{000..044}.tar"),
+            # Repeat a few times to balance the dataset
+            # ~40k examples x3 == ~120k
+            str(self.root / "world1/world1_{000..001}.tar"),
+            str(self.root / "world1/world1_{000..001}.tar"),
+            str(self.root / "world1/world1_{000..001}.tar"),
+        ]
+        ds = urls_to_dataset(urls, self.transformer, val=False, shuffle=True, load_img=True)
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+
+    def val_dataloader(self):
+        urls = [
+            str(self.root / "im2gps_2007/im2gps_2007_val_{000..007}.tar"),
+        ]
+        ds = urls_to_dataset(urls, self.transformer, val=True, shuffle=True, load_img=True)
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
 
@@ -242,7 +325,9 @@ if __name__ == "__main__":
     #for inputs, targets in Im2gpsTest.test_dataloader_3k():
     #    print("Im2gpsTest", inputs.shape, targets.shape)
     #    break
-    for inputs, targets in World1().overfit_dataloader_one():
-        print("World1::overfit_one", inputs.shape, targets.shape)
-        print("World1::overfit_one", targets)
+    for inputs, targets in Img2LocCombined().train_dataloader():
+        print("Img2LocCombined::train", inputs.shape, targets.shape)
+        break
+    for inputs, targets in Img2LocCombined().val_dataloader():
+        print("Img2LocCombined::val", inputs.shape, targets.shape)
         break

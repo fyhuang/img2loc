@@ -1,5 +1,6 @@
-"""Multi-label (one for each parent S2 cell) version of classifier,
-based on EfficientNet-B5.
+"""Multi-label (one for each parent S2 cell) classifier system.
+
+Using pluggable models.
 """
 
 import argparse
@@ -32,37 +33,106 @@ from mlutil import label_mapping, s2cell_mapping, geoguessr_score
 from datasets import World1, Img2LocCombined
 
 
-FT_SCHEDULE_PATH = "finetune_s2cell_efn.yaml"
+def make_efn_model():
+    efn = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
+
+    # in_features = 2048
+    avgpool_out_features = \
+        efn.classifier[1].in_features * \
+            self.avgpool.output_size
+    hidden_size = 2048
+    efn.classifier = nn.Sequential(
+        nn.Linear(avgpool_out_features, hidden_size),
+        nn.SiLU(inplace=True),
+        nn.Dropout(p=0.4, inplace=True),
+        nn.Linear(hidden_size, num_classes), # out is 1776
+        nn.Sigmoid(),
+    )
+
+    return efn
+
+
+def efn_linear_init(layer):
+    init_range = 1.0 / math.sqrt(layer.out_features)
+    nn.init.uniform_(layer.weight, -init_range, init_range)
+    nn.init.zeros_(layer.bias)
+
+def make_efnv2_s_model(num_classes, dropout, hidden):
+    efn = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.DEFAULT)
+
+    # dropout = 0.2
+    # norm_layer=partial(nn.BatchNorm2d, eps=1e-03),
+    # last_channel = 1280
+
+    if not hidden:
+        efn.classifier = nn.Sequential(
+            nn.Dropout(p=dropout, inplace=True),
+            nn.Linear(1280, num_classes),
+            nn.Sigmoid(),
+        )
+
+        # init linear weights
+        efn_linear_init(efn.classifier[1])
+    else:
+        # lr = 7.5e-4
+        efn.classifier = nn.Sequential(
+            nn.Dropout(p=dropout, inplace=True),
+            nn.Linear(1280, 1024),
+            nn.SiLU(inplace=True),
+            nn.Linear(1024, num_classes),
+            nn.Sigmoid(),
+        )
+
+        efn_linear_init(efn.classifier[1])
+        efn_linear_init(efn.classifier[3])
+
+    return efn
+
+def make_efnv2_m_model(num_classes, dropout):
+    efn = models.efficientnet_v2_m(weights=models.EfficientNet_V2_M_Weights.DEFAULT)
+
+    # dropout = 0.3
+    # last_channel = 1280
+    # lr = 1.0e-3
+
+    efn.classifier = nn.Sequential(
+        nn.Dropout(p=dropout, inplace=True),
+        nn.Linear(1280, num_classes),
+        nn.Sigmoid(),
+    )
+
+    # init linear weights
+    efn_linear_init(efn.classifier[1])
+
+    return efn
+
+
+def make_tinyvit_model():
+    pass
+
 
 
 # Define a LightningModule for the classifier
-class S2CellClassifierEfn(L.LightningModule):
-    def __init__(self, label_mapping, learning_rate):
+class S2CellClassifierTask(L.LightningModule):
+    def __init__(self, model_name, label_mapping, overfit, dropout, learning_rate):
         super().__init__()
 
+        if model_name == "efn_v2_s":
+            self.model = make_efnv2_s_model(len(label_mapping), dropout=dropout, hidden=False)
+        elif model_name == "efn_v2_s2":
+            self.model = make_efnv2_s_model(len(label_mapping), dropout=dropout, hidden=True)
+        elif model_name == "efn_v2_m":
+            self.model = make_efnv2_m_model(len(label_mapping), dropout=dropout)
+        else:
+            raise NotImplementedError()
+
+        self.save_hyperparameters("dropout", "learning_rate")
         self.learning_rate = learning_rate
 
+        self.overfit = overfit
         self.label_mapping = label_mapping
         self.s2cell_mapping = s2cell_mapping.S2CellMapping.from_label_mapping(label_mapping)
         num_classes = len(label_mapping)
-
-        efn = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
-
-        self.features = efn.features
-        self.avgpool = nn.AdaptiveAvgPool2d(1)
-
-        # in_features = 2048
-        avgpool_out_features = \
-            efn.classifier[1].in_features * \
-                self.avgpool.output_size
-        hidden_size = 2048
-        self.classifier = nn.Sequential(
-            nn.Linear(avgpool_out_features, hidden_size),
-            nn.SiLU(inplace=True),
-            nn.Dropout(p=0.4, inplace=True),
-            nn.Linear(hidden_size, num_classes), # out is 1776
-            nn.Sigmoid(),
-        )
 
         # Example input array (for logging graph)
         self.example_input_array = torch.zeros(1, 3, 224, 224, dtype=torch.float32)
@@ -72,11 +142,7 @@ class S2CellClassifierEfn(L.LightningModule):
         self.geo_score = geoguessr_score.GeoguessrScore()
 
     def forward(self, x):
-        x = self.features(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        return x
+        return self.model(x)
 
     def logits_to_latlng(self, z):
         # Pick the best S2 cell from model's output and convert to lat/lng
@@ -110,10 +176,10 @@ class S2CellClassifierEfn(L.LightningModule):
 
         z = self.forward(x)
         loss = nn.BCELoss()(z, y)
-        self.log(f"{log_name_prefix}_loss{log_name_suffix}", loss, prog_bar=True, on_step=log_step, on_epoch=(not log_step))
+        self.log(f"{log_name_prefix}_loss{log_name_suffix}", loss, prog_bar=False, on_step=log_step, on_epoch=(not log_step))
 
         self.subset_accuracy(z, y)
-        self.log(f"{log_name_prefix}_acc{log_name_suffix}", self.subset_accuracy, prog_bar=True, on_step=log_step, on_epoch=(not log_step))
+        self.log(f"{log_name_prefix}_acc{log_name_suffix}", self.subset_accuracy, prog_bar=False, on_step=log_step, on_epoch=(not log_step))
 
         self.f1_score(z, y)
         self.log(f"{log_name_prefix}_f1{log_name_suffix}", self.f1_score, on_step=log_step, on_epoch=(not log_step))
@@ -146,20 +212,36 @@ class S2CellClassifierEfn(L.LightningModule):
             lr=self.learning_rate,
         )
 
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
-                    optimizer,
-                    mode="max",
-                    factor=0.5,
-                    patience=10,
-                ),
-                "monitor": "train_acc_step",
-                "interval": "step",
-                "frequency": 1000,
-            },
-        }
+        if self.overfit:
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
+                        optimizer,
+                        mode="max",
+                        factor=0.5,
+                        patience=10,
+                    ),
+                    "monitor": "val_acc",
+                    "interval": "epoch",
+                    "frequency": 1,
+                },
+            }
+        else:
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
+                        optimizer,
+                        mode="max",
+                        factor=0.5,
+                        patience=3,
+                    ),
+                    "monitor": "val_acc",
+                    "interval": "step",
+                    "frequency": 5000,
+                },
+            }
 
 
 def main():
@@ -177,11 +259,13 @@ def main():
     parser.add_argument("--overfit", choices=["1", "5"], default="1")
 
     args = parser.parse_args()
+    print(f"Mode = {args.mode}")
 
     world1 = World1()
     combined_dataset = Img2LocCombined()
     if args.mode != "overfit":
         train_dataloader = combined_dataset.train_dataloader()
+        #train_dataloader = world1.train_dataloader()
         val_dataloader = combined_dataset.val_dataloader()
     else:
         if args.overfit == "1":
@@ -193,85 +277,66 @@ def main():
         else:
             raise NotImplementedError()
 
-    efn_model = S2CellClassifierEfn(
+    task = S2CellClassifierTask(
+        model_name="efn_v2_s2",
         label_mapping=world1.label_mapping,
-        #learning_rate=1.5e-3,
-        learning_rate=5.0e-4,
+        overfit=(args.mode == "overfit"),
+        dropout=0.2,
+        learning_rate=7.5e-4,
     )
 
-    fast_dev_run_args = {}
-    check_val_every_n_epoch = 1
-    if args.mode == "fast_dev_run":
-        # FinetuningScheduler seems to fail if checkpointing/logging not enabled, so only keep the
-        # flags that limit runtime
-        fast_dev_run_args = {
-            "max_epochs": 1,
-            "max_steps": 1,
-            "num_sanity_val_steps": 0,
-            "val_check_interval": 1.0,
-        }
-    elif args.mode == "overfit":
-        check_val_every_n_epoch = 3
+    val_check_interval = 5000
+    callback_interval = 5000
+    stopping_patience = 5 # epochs; TODO
+    if args.mode == "overfit":
+        val_check_interval = 1.0
+        callback_interval = None
+        stopping_patience = 30
 
-    val_acc_patience = 5 // check_val_every_n_epoch
     callbacks = []
-    if args.mode in ["train", "overfit", "gen_ft_sched"]:
-        #callbacks.extend([
-        #    FinetuningScheduler(
-        #        gen_ft_sched_only=(args.mode == "gen_ft_sched"),
-        #        ft_schedule=FT_SCHEDULE_PATH,
-        #    ),
-        #    FTSCheckpoint(
-        #        monitor="val_acc",
-        #        mode="max",
-        #        save_last=True,
-        #        save_top_k=3,
-        #    ),
-        #    FTSEarlyStopping(
-        #        patience=val_acc_patience,
-        #        monitor="val_acc",
-        #        mode="max",
-        #        verbose=True,
-        #    ),
-        #])
+    if args.mode not in ["lr_find"]:
         callbacks.extend([
             L.pytorch.callbacks.ModelCheckpoint(
                 monitor="val_acc",
                 mode="max",
                 save_last=True,
                 save_top_k=3,
+                every_n_train_steps=callback_interval,
             ),
-            L.pytorch.callbacks.EarlyStopping(
-                patience=val_acc_patience,
-                monitor="val_acc",
-                mode="max",
-                verbose=True,
+            #L.pytorch.callbacks.EarlyStopping(
+            #    patience=stopping_patience,
+            #    monitor="val_acc",
+            #    mode="max",
+            #    verbose=True,
+            #),
+            L.pytorch.callbacks.LearningRateMonitor(
+                logging_interval="step"
             ),
         ])
 
-    callbacks.extend([
-        L.pytorch.callbacks.LearningRateMonitor(
-            logging_interval="step"
-        ),
-    ])
+    limit_args = {}
+    if args.limit_batches is not None:
+        limit_args = {
+            #"limit_train_batches": args.limit_batches,
+            "limit_val_batches": args.limit_batches,
+        }
 
     trainer = L.Trainer(
+        fast_dev_run=(args.mode == "fast_dev_run"),
         accelerator=args.accelerator,
         callbacks=callbacks,
-        limit_train_batches=args.limit_batches,
-        limit_val_batches=args.limit_batches // 20,
-        check_val_every_n_epoch=check_val_every_n_epoch,
+        val_check_interval=val_check_interval,
         logger=L.pytorch.loggers.TensorBoardLogger(
             save_dir=".",
             log_graph=True,
         ),
-        **fast_dev_run_args,
+        **limit_args,
     )
 
     if args.mode == "lr_find":
         tuner = lightning.pytorch.tuner.Tuner(trainer)
         lr_finder = tuner.lr_find(
-            model=efn_model,
+            model=task,
             train_dataloaders=train_dataloader,
             val_dataloaders=val_dataloader,
         )
@@ -279,7 +344,7 @@ def main():
         print(f"Suggested learning rate: {lr_finder.suggestion()}")
     else:
         trainer.fit(
-            model=efn_model,
+            model=task,
             train_dataloaders=train_dataloader,
             val_dataloaders=val_dataloader,
             ckpt_path=args.ckpt_path,

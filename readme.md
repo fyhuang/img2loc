@@ -232,6 +232,15 @@ Changes:
 * Fewer classes -- more examples per class
 * Includes some high quality data from Street View
 
+Findings
+
+* Without dropout, seemed to perform OK (f1 = 0.43)
+* Training feels so slow with the larger dataset
+* Dropout (p=0.4) at the hidden layer makes it perform way worse (although this is what EFN defaults to)
+
 To do:
 
-- [ ] Debug the GeoGuessr score implementation
+- [x] Debug the GeoGuessr score implementation
+- [ ] Set up "infinite training" (do validation, LR scheduler, etc. in the middle of long epoch)
+- [ ] Try out tinyvit
+- [ ] Do ONNX js with best results from EFN
