@@ -1,0 +1,30 @@
+{
+  "name": "webdemo",
+  "version": "1.0.0",
+  "description": "A JavaScript project",
+  "main": "./dist/index.js",
+  "scripts": {
+    "start": "node ./node_modules/parcel-bundler/bin/cli serve ./src/index.html --port 8080",
+    "build": "node ./node_modules/parcel-bundler/bin/cli build ./src/index.html --out-dir ./dist/",
+    "lint": "node ./node_modules/eslint/bin/eslint . --ext .js --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.1",
+    "parcel-bundler": "^1.12.5",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "jimp": "^0.22.12",
+    "leaflet": "^1.9.4",
+    "onnxruntime-web": "^1.18.0"
+  }
+}

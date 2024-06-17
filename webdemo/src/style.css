@@ -1,0 +1,14 @@
+div#output-map {
+  width: 640px;
+  height: 640px;
+}
+
+#input-image {
+  display: none;
+}
+
+#input-image-canvas {
+  width: 224px;
+  height: 224px;
+  border: 2px solid #333;
+}
