@@ -43,6 +43,7 @@ TRAIN_T = T.Compose([
     T.RandomResizedCrop(224),
     T.RandomHorizontalFlip(),
     T.ToImage(),
+    T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
     T.ToDtype(torch.float32, scale=True),
     NORMALIZE_T,
 ])
@@ -136,12 +137,13 @@ class Im2gps2007:
             raise NotImplementedError()
 
     def _make_to_img_label(self, val=True):
-        def to_img_label(sample):
-            img, meta = sample
-            if val:
-                return VAL_T(img), self.transformer.meta_to_label_tensor(meta)
-            return TRAIN_T(img), self.transformer.meta_to_label_tensor(meta)
-        return to_img_label
+        #def to_img_label(sample):
+        #    img, meta = sample
+        #    if val:
+        #        return VAL_T(img), self.transformer.meta_to_label_tensor(meta)
+        #    return TRAIN_T(img), self.transformer.meta_to_label_tensor(meta)
+        #return to_img_label
+        return self.transformer.make_to_img_label(val)
 
     def _to_label_only(self, sample):
         img, meta = sample
@@ -211,6 +213,13 @@ class Im2gps2007:
             load_img=True
         )
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+
+    def test_dataloader_3k(self, batch_size=1):
+        test_dataset = wds.WebDataset(str(self.root / "im2gps3ktest/im2gps3ktest_000.tar"))
+        test_dataset = test_dataset.decode("pil").to_tuple("jpg", "json")\
+            .map(self._make_to_img_label(val=True))\
+            .batched(batch_size)
+        return wds.WebLoader(test_dataset, batch_size=None, num_workers=auto_dataloader_workers())
 
 
 class World1:
@@ -290,25 +299,26 @@ class Img2LocCombined:
         ds = urls_to_dataset(urls, self.transformer, val=False, shuffle=True, load_img=True)
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
+    def train_dataloader_small(self):
+        # Total is ~720k examples
+        urls = [
+            # im2gps 2007 is ~591k examples
+            str(self.root / "im2gps_2007/im2gps_2007_train_{000..028}.tar"),
+            # Repeat a few times to balance the dataset
+            # ~40k examples x3 == ~120k
+            str(self.root / "world1/world1_{000..001}.tar"),
+            str(self.root / "world1/world1_{000..001}.tar"),
+            str(self.root / "world1/world1_{000..001}.tar"),
+        ]
+        ds = urls_to_dataset(urls, self.transformer, val=False, shuffle=True, load_img=True)
+        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+
     def val_dataloader(self):
         urls = [
             str(self.root / "im2gps_2007/im2gps_2007_val_{000..007}.tar"),
         ]
         ds = urls_to_dataset(urls, self.transformer, val=True, shuffle=True, load_img=True)
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
-
-
-# im2gps test sets
-class Im2gpsTest:
-    root_3k = Path.home() / "datasets" / "im2gps3ktest"
-
-    @classmethod
-    def test_dataloader_3k(cls, batch_size=1):
-        test_dataset = wds.WebDataset(str(cls.root_3k / "wds" / "im2gps3ktest_000.tar"))
-        test_dataset = test_dataset.decode("pil").to_tuple("jpg", "json")\
-            .map(Im2gps2007._to_img_latlng)\
-            .batched(batch_size)
-        return wds.WebLoader(test_dataset, batch_size=None, num_workers=auto_dataloader_workers())
 
 
 if __name__ == "__main__":

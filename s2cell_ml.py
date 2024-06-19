@@ -30,7 +30,7 @@ import s2sphere
 import tqdm
 
 from mlutil import label_mapping, s2cell_mapping, geoguessr_score
-from datasets import World1, Img2LocCombined
+from datasets import World1, Img2LocCombined, Im2gps2007
 
 
 def make_efn_model():
@@ -235,11 +235,11 @@ class S2CellClassifierTask(L.LightningModule):
                         optimizer,
                         mode="max",
                         factor=0.5,
-                        patience=3,
+                        patience=15,
                     ),
                     "monitor": "val_acc",
                     "interval": "step",
-                    "frequency": 5000,
+                    "frequency": 10000,
                 },
             }
 
@@ -264,8 +264,9 @@ def main():
     world1 = World1()
     combined_dataset = Img2LocCombined()
     if args.mode != "overfit":
-        train_dataloader = combined_dataset.train_dataloader()
+        #train_dataloader = combined_dataset.train_dataloader()
         #train_dataloader = world1.train_dataloader()
+        train_dataloader = combined_dataset.train_dataloader_small()
         val_dataloader = combined_dataset.val_dataloader()
     else:
         if args.overfit == "1":
@@ -282,37 +283,64 @@ def main():
         label_mapping=world1.label_mapping,
         overfit=(args.mode == "overfit"),
         dropout=0.2,
-        learning_rate=7.5e-4,
+        #learning_rate=7.5e-4,
+        learning_rate=1.0e-5,
     )
 
-    val_check_interval = 5000
-    callback_interval = 5000
+    if args.mode == "lr_find":
+        if args.ckpt_path is not None:
+            task = S2CellClassifierTask.load_from_checkpoint(
+                args.ckpt_path,
+                model_name="efn_v2_s2",
+                label_mapping=world1.label_mapping,
+                overfit=(args.mode == "overfit"),
+            )
+
+        trainer = L.Trainer(
+            accelerator=args.accelerator,
+            logger=False,
+        )
+        tuner = lightning.pytorch.tuner.Tuner(trainer)
+        lr_finder = tuner.lr_find(
+            model=task,
+            train_dataloaders=train_dataloader,
+            val_dataloaders=val_dataloader,
+        )
+        #print(lr_finder.results)
+        fig = lr_finder.plot(suggest=True)
+        fig.savefig("lr_finder.png")
+
+        print(f"Suggested learning rate: {lr_finder.suggestion()}")
+        return
+
+    #val_check_interval = 5000
+    #callback_interval = 5000
+    val_check_interval = 10000
+    callback_interval = 10000
     stopping_patience = 5 # epochs; TODO
     if args.mode == "overfit":
         val_check_interval = 1.0
         callback_interval = None
         stopping_patience = 30
 
-    callbacks = []
-    if args.mode not in ["lr_find"]:
-        callbacks.extend([
-            L.pytorch.callbacks.ModelCheckpoint(
-                monitor="val_acc",
-                mode="max",
-                save_last=True,
-                save_top_k=3,
-                every_n_train_steps=callback_interval,
-            ),
-            #L.pytorch.callbacks.EarlyStopping(
-            #    patience=stopping_patience,
-            #    monitor="val_acc",
-            #    mode="max",
-            #    verbose=True,
-            #),
-            L.pytorch.callbacks.LearningRateMonitor(
-                logging_interval="step"
-            ),
-        ])
+    callbacks = [
+        L.pytorch.callbacks.ModelCheckpoint(
+            monitor="val_acc",
+            mode="max",
+            save_last=True,
+            save_top_k=3,
+            every_n_train_steps=callback_interval,
+        ),
+        #L.pytorch.callbacks.EarlyStopping(
+        #    patience=stopping_patience,
+        #    monitor="val_acc",
+        #    mode="max",
+        #    verbose=True,
+        #),
+        L.pytorch.callbacks.LearningRateMonitor(
+            logging_interval="step"
+        ),
+    ]
 
     limit_args = {}
     if args.limit_batches is not None:
@@ -333,23 +361,13 @@ def main():
         **limit_args,
     )
 
-    if args.mode == "lr_find":
-        tuner = lightning.pytorch.tuner.Tuner(trainer)
-        lr_finder = tuner.lr_find(
-            model=task,
-            train_dataloaders=train_dataloader,
-            val_dataloaders=val_dataloader,
-        )
-        print(lr_finder.results)
-        print(f"Suggested learning rate: {lr_finder.suggestion()}")
-    else:
-        trainer.fit(
-            model=task,
-            train_dataloaders=train_dataloader,
-            val_dataloaders=val_dataloader,
-            ckpt_path=args.ckpt_path,
-        )
-        print("Training done")
+    trainer.fit(
+        model=task,
+        train_dataloaders=train_dataloader,
+        val_dataloaders=val_dataloader,
+        ckpt_path=args.ckpt_path,
+    )
+    print("Training done")
 
 
 if __name__ == "__main__":

@@ -40,6 +40,9 @@ class LabelMapping:
     def __len__(self):
         return len(self.label_to_name)
 
+    def has_name(self, name):
+        return name in self.name_to_label
+
     def get_label(self, name):
         assert type(name) == str
         return self.name_to_label[name]
