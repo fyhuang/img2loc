@@ -1,14 +1,101 @@
-div#output-map {
-  width: 640px;
-  height: 640px;
+body {
+  background: rgb(255,255,255);
+background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,247,236,1) 100%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+
+  font-family: "Roboto", sans-serif;
 }
 
-#input-image {
-  display: none;
+h1#title {
+  font-family: "Oswald", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 300;
+  font-size: 60px;
+  text-align: center;
+
+  /*color: #c50;
+  filter: drop-shadow(-5px -5px 0 #666);
+  transform: perspective(400px) rotateY(20deg) rotateX(-5deg);*/
+
+  color: #48d;
+  text-shadow:
+    0px 1px 0 #999,
+    0px 2px 0 #999,
+    0px 3px 0 #999,
+    0px 4px 0 #999;
+}
+
+h2 {
+  font-weight: 400;
+  font-size: 30px;
+  text-align: center;
+
+  margin-top: 60px;
+}
+
+.content {
+    max-width: 768px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+
+#io {
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+#io div {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.large-icon {
+  font-size: 80px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 #input-image-canvas {
   width: 224px;
   height: 224px;
   border: 2px solid #333;
+}
+
+div#output-map {
+  width: 224px;
+  height: 224px;
+  border: 2px solid #333;
+}
+
+#status-display {
+  color: black;
+  background-color: #ccc;
+  border-radius: 5px;
+  padding: 5px;
+
+  max-width: 384px;
+  margin-left: auto;
+  margin-right: auto;
+
+  font-family: monospace;
+  font-size: 1.5em;
+  text-align: center;
+}
+
+#status-display.error {
+  color: red;
+}
+
+#examples img {
+  width: 224px;
+  height: 224px;
+}
+
+#input-image {
+  display: none;
 }

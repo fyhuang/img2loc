@@ -23,8 +23,5 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
-    "jimp": "^0.22.12",
-    "leaflet": "^1.9.4",
-    "onnxruntime-web": "^1.18.0"
   }
 }
