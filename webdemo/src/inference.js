@@ -1,7 +1,5 @@
 'use strict';
 
-import { S2 } from "s2-geometry";
-
 import { LABEL_MAP } from "./label_map";
 
 async function userFileToBase64(file) {
@@ -50,6 +48,7 @@ function tensorFromData(data) {
 
 export class ImageInferenceHandler {
     constructor(previewImgEl, canvasEl, leafletMap, statusDisplay) {
+        this.session = null;
         this.previewImgEl = previewImgEl;
         this.canvasEl = canvasEl;
         this.leafletMap = leafletMap;
@@ -65,14 +64,31 @@ export class ImageInferenceHandler {
         });
     }
 
+    async startSession() {
+        this.statusDisplay.log("Setting up model...");
+
+        if (this.session === null) {
+            this.session = await ort.InferenceSession.create(
+                "https://media.githubusercontent.com/media/fyhuang/img2loc/main/exports/s2cell_ml_efn_v2_s2_train1.onnx",
+                { executionProviders: ["wasm"], graphOptimizationLevel: "all" }
+            );
+        }
+
+        return this.session;
+    }
+
     async processUserFile(file) {
         this.statusDisplay.log("Processing image...");
         const imgBase64 = await userFileToBase64(file);
         this.previewImgEl.src = imgBase64;
     }
 
+    async processUrl(url) {
+        this.statusDisplay.log("Processing image...");
+        this.previewImgEl.src = url;
+    }
+
     async runInferenceDemo(data) {
-        this.statusDisplay.log("Running inference...");
         const labelsArray = await this.runInferenceMultilabel(data);
 
         if (labelsArray.length === 0) {
@@ -101,35 +117,10 @@ export class ImageInferenceHandler {
     }
 
     async runInferenceMultilabel(data) {
+        const session = await this.startSession();
+
+        this.statusDisplay.log("Running inference...");
         const imageTensor = tensorFromData(data);
-        // console.log(imageTensor);
-        console.log(S2.latLngToKey(37.7749, -122.4194, 15));
-
-        /*const modelResponse = await fetch(
-            //"https://github.com/fyhuang/img2loc/releases/download/v1/s2cell_ml_efn_v2_s2_train1.onnx",
-            "https://objects.githubusercontent.com/github-production-release-asset-2e65be/765955984/ce794da9-0b29-452c-aa17-ae8e5d95ddc5?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=releaseassetproduction%2F20240619%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20240619T210826Z&X-Amz-Expires=300&X-Amz-Signature=bbf31719947c2d2f4a2d64a74a6338ff0dfaad779263eb1930a7b4f0f98d99d2&X-Amz-SignedHeaders=host&actor_id=0&key_id=0&repo_id=765955984&response-content-disposition=attachment%3B%20filename%3Ds2cell_ml_efn_v2_s2_train1.onnx&response-content-type=application%2Foctet-stream",
-            //{ mode: "no-cors" }
-        );
-        console.log(modelResponse);
-        if (modelResponse.status !== 200) {
-            console.error("Failed to fetch model", modelResponse.status, modelResponse.statusText);
-            return [];
-        }
-
-        const modelArrayBuffer = await modelResponse.arrayBuffer();
-        console.log(modelArrayBuffer);
-
-        const session = await ort.InferenceSession.create(
-            modelArrayBuffer,
-            { executionProviders: ["wasm"], graphOptimizationLevel: "all" }
-        );*/
-
-
-        const session = await ort.InferenceSession.create(
-            "https://media.githubusercontent.com/media/fyhuang/img2loc/main/exports/s2cell_ml_efn_v2_s2_train1.onnx",
-            { executionProviders: ["wasm"], graphOptimizationLevel: "all" }
-        );
-
         const feeds = {};
         feeds[session.inputNames[0]] = imageTensor;
 

@@ -5,6 +5,8 @@ background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,247,236,1) 
   background-attachment: fixed;
 
   font-family: "Roboto", sans-serif;
+
+  padding-bottom: 8em;
 }
 
 h1#title {
@@ -38,8 +40,8 @@ h2 {
     max-width: 768px;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1em;
-    padding-right: 1em;
+    padding-left: 2em;
+    padding-right: 2em;
 }
 
 #io {
@@ -94,6 +96,10 @@ div#output-map {
 #examples img {
   width: 224px;
   height: 224px;
+}
+
+#examples div {
+  text-align: center;
 }
 
 #input-image {

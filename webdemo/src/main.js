@@ -30,12 +30,43 @@ document.getElementById("image-file")
 
 
 function generateExamples() {
-  const e1 = new URL("sv__0IFyG3VFWd7XfHiy1LY9w.jpg", import.meta.url);
-  /*const examplesArray = [
-    [new URL("sv__0IFyG3VFWd7XfHiy1LY9w.jpg", import.meta.url), "Italy (near Naples)"],
-  ];*/
   const examplesArray = [
-    [e1, "Italy (near Naples)"],
+    [
+      new URL("examples/sv__0IFyG3VFWd7XfHiy1LY9w.jpg", import.meta.url),
+      "Italy (near Naples)"
+    ],
+    [
+      new URL("examples/sv__djmpcK-Eofhl9xcPDdoLA.jpg", import.meta.url),
+      "NYC (Hoboken)"
+    ],
+    [
+      new URL("examples/sv__OMAtQ9zCwQGyVzrpxtxfg.jpg", import.meta.url),
+      "Japan (near Fukuoka)"
+    ],
+    [
+      new URL("examples/sv__PAgKQ38IE8PstRsbApzGQ.jpg", import.meta.url),
+      "Japan (Tokyo)"
+    ],
+    [
+      new URL("examples/sv_eP8H2JRDpYKVCck-vkw8gg.jpg", import.meta.url),
+      "California, USA (near Stockton)"
+    ],
+    [
+      new URL("examples/sv_eR0OxFSWO4p8gFNPneJFtQ.jpg", import.meta.url),
+      "Switzerland (East region)"
+    ],
+    [
+      new URL("examples/sv_oX6JMJhxRHPN5hS2X-y2rw.jpg", import.meta.url),
+      "Germany (near Cologne)"
+    ],
+    [
+      new URL("examples/sv_oZSwJfK_88z6bgUti7Ivzg.jpg", import.meta.url),
+      "Indonesia (Central Java)"
+    ],
+    [
+      new URL("examples/sv_u0XVxdurG6afYxiyBRf7jw.jpg", import.meta.url),
+      "Nigeria (Lagos)"
+    ]
   ];
 
   const exampleContainer = document.getElementById("examples");
@@ -50,6 +81,7 @@ function generateExamples() {
     const img = document.createElement("img");
     img.src = url;
     img.addEventListener("click", () => {
+      window.scrollTo(0, 0);
       imgHandler.processUrl(url);
     });
     unit.appendChild(img);
