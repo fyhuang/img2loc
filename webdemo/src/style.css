@@ -1,8 +1,9 @@
 body {
-  background: rgb(255,255,255);
-background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,247,236,1) 100%);
+  /*background: rgb(255,255,255);
+  background: linear-gradient(180deg, rgba(255,255,255,1) 0%, rgba(255,247,236,1) 100%);
   background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-attachment: fixed;*/
+  background: #ffecc8;
 
   font-family: "Roboto", sans-serif;
 
@@ -13,7 +14,7 @@ h1#title {
   font-family: "Oswald", sans-serif;
   font-optical-sizing: auto;
   font-weight: 300;
-  font-size: 60px;
+  font-size: 70px;
   text-align: center;
 
   /*color: #c50;
@@ -22,10 +23,10 @@ h1#title {
 
   color: #48d;
   text-shadow:
-    0px 1px 0 #999,
-    0px 2px 0 #999,
-    0px 3px 0 #999,
-    0px 4px 0 #999;
+    0px 1px 0 #aaa,
+    0px 2px 0 #aaa,
+    0px 3px 0 #aaa,
+    0px 4px 0 #aaa;
 }
 
 h2 {
@@ -65,6 +66,7 @@ h2 {
 #input-image-canvas {
   width: 224px;
   height: 224px;
+  background: #ccc;
   border: 2px solid #333;
 }
 

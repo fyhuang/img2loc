@@ -2,7 +2,6 @@
   "name": "webdemo",
   "version": "1.0.0",
   "description": "A JavaScript project",
-  "main": "./dist/index.js",
   "scripts": {
     "start": "npx parcel serve ./src/index.html --port 8080",
     "build": "npx parcel build ./src/index.html --dist-dir ./dist/",
