@@ -55,12 +55,7 @@ export class ImageInferenceHandler {
         this.statusDisplay = statusDisplay;
 
         previewImgEl.addEventListener("load", (e) => {
-            var ctx = this.canvasEl.getContext("2d");
-            ctx?.drawImage(e.target, 0, 0, this.canvasEl.width, this.canvasEl.height);
-            const data = ctx?.getImageData(0, 0, this.canvasEl.width, this.canvasEl.height);
-            console.log(this.canvasEl.width, this.canvasEl.height);
-
-            this.runInferenceDemo(data);
+            this.runInferenceDemo();
         });
     }
 
@@ -88,7 +83,17 @@ export class ImageInferenceHandler {
         this.previewImgEl.src = url;
     }
 
-    async runInferenceDemo(data) {
+    async getImageData() {
+        this.statusDisplay.log("Extracting image data...");
+        var ctx = this.canvasEl.getContext("2d");
+        ctx?.drawImage(this.previewImgEl, 0, 0, this.canvasEl.width, this.canvasEl.height);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return ctx?.getImageData(0, 0, this.canvasEl.width, this.canvasEl.height);
+    }
+
+    async runInferenceDemo() {
+        const data = await this.getImageData();
+
         const labelsArray = await this.runInferenceMultilabel(data);
 
         if (labelsArray.length === 0) {
@@ -127,8 +132,8 @@ export class ImageInferenceHandler {
         const outputFeeds = await session.run(feeds);
         const outputTensor = outputFeeds[session.outputNames[0]];
 
-        // Is the output already softmaxed?
-        console.log(outputTensor);
+        // Is the output already sigmoided?
+        //console.log(outputTensor);
 
         // Get top classes
         const labelsArray = [];

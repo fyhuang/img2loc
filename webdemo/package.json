@@ -22,5 +22,11 @@
     "typescript": "^5.4.5"
   },
   "dependencies": {
+  },
+  "targets": {
+    "default": {
+      "distDir": "./dist",
+      "publicUrl": "/img2loc"
+    }
   }
 }
