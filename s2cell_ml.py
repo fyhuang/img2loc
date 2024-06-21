@@ -32,6 +32,7 @@ import tqdm
 from mlutil import label_mapping, s2cell_mapping, geoguessr_score
 from datasets import World1, Img2LocCombined, Im2gps2007
 
+from tiny_vit import tiny_vit_21m_224
 
 def make_efn_model():
     efn = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
@@ -68,7 +69,7 @@ def make_efnv2_s_model(num_classes, dropout, hidden):
         efn.classifier = nn.Sequential(
             nn.Dropout(p=dropout, inplace=True),
             nn.Linear(1280, num_classes),
-            nn.Sigmoid(),
+            #nn.Sigmoid(),
         )
 
         # init linear weights
@@ -80,7 +81,7 @@ def make_efnv2_s_model(num_classes, dropout, hidden):
             nn.Linear(1280, 1024),
             nn.SiLU(inplace=True),
             nn.Linear(1024, num_classes),
-            nn.Sigmoid(),
+            #nn.Sigmoid(),
         )
 
         efn_linear_init(efn.classifier[1])
@@ -107,8 +108,45 @@ def make_efnv2_m_model(num_classes, dropout):
     return efn
 
 
-def make_tinyvit_model():
-    pass
+def make_vitb16_model(num_classes):
+    vitb = models.vit_b_16(weights=models.ViT_B_16_Weights.IMAGENET1K_V1)
+
+    # dropout = 0.0
+    # hidden_dim = 768
+    # mlp_dim = 3072
+    # lr = 3e-4
+
+    heads_layers = collections.OrderedDict()
+    heads_layers["pre_logits"] = nn.Linear(768, 1280)
+    heads_layers["act"] = nn.Tanh()
+    heads_layers["head"] = nn.Linear(1280, num_classes)
+    vitb.heads = nn.Sequential(heads_layers)
+
+    fan_in = vitb.heads.pre_logits.in_features
+    nn.init.trunc_normal_(vitb.heads.pre_logits.weight, std=math.sqrt(1.0 / fan_in))
+    nn.init.zeros_(vitb.heads.pre_logits.bias)
+
+    nn.init.zeros_(vitb.heads.head.weight)
+    nn.init.zeros_(vitb.heads.head.bias)
+
+    return vitb
+
+def make_tinyvit_21m224_model(num_classes):
+    tvit = tiny_vit_21m_224(pretrained=True)
+
+    # embed_dims = [96, 192, 384, 576]
+    # drop_path_rate = 0.2
+
+    # LRs at configs:
+    # https://github.com/wkcn/TinyViT/blob/main/configs/22kto1k/tiny_vit_21m_22kto1k.yaml
+    # https://github.com/wkcn/TinyViT/blob/main/configs/higher_resolution/tiny_vit_21m_224to384.yaml
+    # https://github.com/wkcn/TinyViT/blob/main/configs/higher_resolution/tiny_vit_21m_384to512.yaml
+
+    tvit.head = nn.Linear(576, num_classes)
+    nn.init.trunc_normal_(tvit.head.weight, std=0.02)
+    nn.init.zeros_(tvit.head.bias)
+
+    return tvit
 
 
 
@@ -123,8 +161,12 @@ class S2CellClassifierTask(L.LightningModule):
             self.model = make_efnv2_s_model(len(label_mapping), dropout=dropout, hidden=True)
         elif model_name == "efn_v2_m":
             self.model = make_efnv2_m_model(len(label_mapping), dropout=dropout)
+        elif model_name == "vitb16":
+            self.model = make_vitb16_model(len(label_mapping))
+        elif model_name == "tinyvit_21m_224":
+            self.model = make_tinyvit_21m224_model(len(label_mapping))
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(f"No model: {model_name}")
 
         self.save_hyperparameters("dropout", "learning_rate")
         self.learning_rate = learning_rate
@@ -174,9 +216,15 @@ class S2CellClassifierTask(L.LightningModule):
         if log_step:
             log_name_suffix = "_step"
 
-        z = self.forward(x)
-        loss = nn.BCELoss()(z, y)
+        # Positive weights for BCEWithLogitsLoss
+        # Imbalance is ~1:155
+        positive_weights = torch.ones(y.shape[1], dtype=torch.float32, device=y.device) * 150.0
+
+        logits = self.forward(x)
+        loss = nn.BCEWithLogitsLoss(pos_weight=positive_weights)(logits, y)
         self.log(f"{log_name_prefix}_loss{log_name_suffix}", loss, prog_bar=False, on_step=log_step, on_epoch=(not log_step))
+
+        z = nn.Sigmoid()(logits)
 
         self.subset_accuracy(z, y)
         self.log(f"{log_name_prefix}_acc{log_name_suffix}", self.subset_accuracy, prog_bar=False, on_step=log_step, on_epoch=(not log_step))
@@ -220,9 +268,9 @@ class S2CellClassifierTask(L.LightningModule):
                         optimizer,
                         mode="max",
                         factor=0.5,
-                        patience=10,
+                        patience=50,
                     ),
-                    "monitor": "val_acc",
+                    "monitor": "val_f1",
                     "interval": "epoch",
                     "frequency": 1,
                 },
@@ -237,7 +285,7 @@ class S2CellClassifierTask(L.LightningModule):
                         factor=0.5,
                         patience=15,
                     ),
-                    "monitor": "val_acc",
+                    "monitor": "val_f1",
                     "interval": "step",
                     "frequency": 10000,
                 },
@@ -278,13 +326,28 @@ def main():
         else:
             raise NotImplementedError()
 
+    model_hparams_efn_v2_s2 = {
+        "model_name": "efn_v2_s2",
+        "dropout": 0.2,
+        "learning_rate": 1.0e-3,
+    }
+
+    model_hparams_vitb16 = {
+        "model_name": "vitb16",
+        "dropout": 0.0,
+        "learning_rate": 3.0e-4,
+    }
+
+    model_hparams_tinyvit_21m_224 = {
+        "model_name": "tinyvit_21m_224",
+        "dropout": 0.0,
+        "learning_rate": 2.5e-4,
+    }
+
     task = S2CellClassifierTask(
-        model_name="efn_v2_s2",
         label_mapping=world1.label_mapping,
         overfit=(args.mode == "overfit"),
-        dropout=0.2,
-        #learning_rate=7.5e-4,
-        learning_rate=1.0e-5,
+        **model_hparams_tinyvit_21m_224,
     )
 
     if args.mode == "lr_find":
@@ -325,7 +388,7 @@ def main():
 
     callbacks = [
         L.pytorch.callbacks.ModelCheckpoint(
-            monitor="val_acc",
+            monitor="val_f1",
             mode="max",
             save_last=True,
             save_top_k=3,
@@ -356,7 +419,7 @@ def main():
         val_check_interval=val_check_interval,
         logger=L.pytorch.loggers.TensorBoardLogger(
             save_dir=".",
-            log_graph=True,
+            #log_graph=True,
         ),
         **limit_args,
     )

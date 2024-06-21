@@ -56,6 +56,14 @@ VAL_T = T.Compose([
     NORMALIZE_T,
 ])
 
+VAL_ZOOM_T = T.Compose([
+    T.Resize(256),
+    T.CenterCrop(224),
+    T.ToImage(),
+    T.ToDtype(torch.float32, scale=True),
+    NORMALIZE_T,
+])
+
 
 class _GeoDatasetTransformer:
     def __init__(self, label_mapping, s2cell_mapping):
@@ -83,7 +91,8 @@ class _GeoDatasetTransformer:
     def make_to_img_label(self, val=True):
         def to_img_label(sample):
             img, meta = sample
-            transformed_img = VAL_T(img) if val else TRAIN_T(img)
+            #transformed_img = VAL_T(img) if val else TRAIN_T(img)
+            transformed_img = VAL_ZOOM_T(img) if val else TRAIN_T(img)
             labels = self.meta_to_label_tensor(meta)
             if labels is None:
                 return None
