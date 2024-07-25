@@ -9,6 +9,13 @@ tensor(25000.)
 >>> s.update(torch.tensor([[40.74847, -73.98570]]), torch.tensor([[35.75040, -83.99380]]))
 >>> torch.round(s.compute())
 tensor(18750.)
+
+Should also support batches of inputs:
+
+>>> s = GeoguessrScore()
+>>> s.update(torch.tensor([[0.0, 0.0], [0.0, 0.0]]), torch.tensor([[0.0, 0.0], [0.0, 0.0]]))
+>>> s.compute()
+tensor(25000.)
 """
 
 import torch
@@ -21,7 +28,8 @@ def _haversine(ll1, ll2):
     phi1, phi2 = torch.deg2rad(lat1), torch.deg2rad(lat2)
     delta_phi, delta_lambda = torch.deg2rad(lat2-lat1), torch.deg2rad(lon2-lon1)
     a = torch.sin(delta_phi/2)**2 + torch.cos(phi1) * torch.cos(phi2) * torch.sin(delta_lambda/2)**2
-    return torch.mean(2 * r * torch.asin(torch.sqrt(a)))
+    #return torch.mean(2 * r * torch.asin(torch.sqrt(a)), dim=1)
+    return 2 * r * torch.asin(torch.sqrt(a))
 
 class GeoguessrScore(Metric):
     def __init__(self, **kwargs):
