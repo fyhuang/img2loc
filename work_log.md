@@ -222,6 +222,127 @@ Findings
 To do:
 
 - [x] Debug the GeoGuessr score implementation
-- [ ] Set up "infinite training" (do validation, LR scheduler, etc. in the middle of long epoch)
-- [ ] Try out tinyvit
-- [ ] Do ONNX js with best results from EFN
+- [x] Set up "infinite training" (do validation, LR scheduler, etc. in the middle of long epoch)
+- [x] Try out tinyvit
+- [x] Do ONNX js with best results from EFN
+- [x] Cluster dataset and remove bad examples
+
+### Attempt #4 (EFN small v2, with different dataset sizes)
+
+Larger dataset didn't seem to improve performance.
+Even after removing weird clusters, performance still seems lower than with the smaller dataset.
+Experiment with: same val set, but different subsets of the training set.
+
+Common hparams:
+* Max steps: 200k.
+  Calculation: 58k steps per epoch, 200k steps is ~4 epochs. (12h per run)
+* LR scheduler: 1k steps x 50 patience, using train_loss_step
+* Data: 224px, random center crop, color jitter (0.1x4)
+* Val values unsmoothed.
+* Train loss from last step (smoothed).
+* Val metrics are best from run.
+
+| Training set fraction | Log version | Train loss | Val loss | Val F1 | Val acc |
+| --------------------- | ----------- | - | - | - | - |
+| world              | 1 | 0.1981 | 1.495 | 0.0403 | 0 |
+| world + im2gps 10% | 2 | 0.2855 | 0.512 | 0.0259 | 0 |
+| world + im2gps 50% | 3 | 0.4299 | 0.502 | 0.0241 | 0 |
+
+For following experiments:
+
+* Dataset: world + im2gps 10%
+* Batch size 16, max steps 200k
+
+| Experiment | Log version | Train loss | Val loss | Val F1 | Val acc |
+| ---------- | ----------- | - | - | - | - |
+| hidden 2048          | 4 | 0.2704 | 0.504 | 0.0300 | 0 |
+| hidden 2048 aug 0.01 | 5 | 0.3834 | 0.502 | 0.0263 | 0 |
+| hidden 2048 ndo      | 6 | 0.3441 | 0.523 | 0.0287 | 0 |
+| hidden 2048 aug2     | 7 | 0.3177 | 0.498 | 0.0256 | 0 |
+| hidden 2048 aug2 fval| 8 | - | - | - |
+
+Notes:
+
+* Hidden 2048. Helped somewhat
+* aug 0.01: reduce hue/sat jitter to 0.01. Didn't help (val worse)
+* ndo: no dropout. Didn't help (val worse)
+* aug2: brightness/contrast jitter to 0.01. hue/sat jitter to 0. Seemed to help, but scheduler skipped lowering the LR.
+* fval: full val crop (no zoom). Helped val performance in early epochs. Stopped early b/c I realized it doesn't affect train-time at all.
+
+For following experiments:
+
+* Kept hidden size at 2048.
+* Kept augmentation at "aug2" (no hue/sat jitter; b/c jitter at 0.01).
+* Kept validation at no zoom.
+* Dropout remains at default (p=0.2).
+
+| Experiment | Log version | Train loss | Val loss | Val F1 | Val acc |
+| ---------- | ----------- | - | - | - | - |
+| 384                 | 10-11 | 0.3937 | 0.540 | 0.0235 | 0 |
+| hidden-do           | 12    | 0.2936 | 0.490 | 0.0304 | 0 |
+| mnet3               | 13    | 0.3424 | 0.554 | 0.0316 | 0 |
+| vitb16              | 14    | 0.3669 | 0.613 | 0.0286 | 0 |
+| tvit-v2             | 15    | 0.4917 | 0.680 | 0.0026 | 0 |
+
+Notes:
+
+* 384: training + val at 384px. Batch size 8, increased max_steps to 400k.
+  Performed worse; however, I forget to change the LR scheduler interval.
+  Tests with smaller batch size are also taking way too long.
+* 512: training + val at 512px.
+* hidden-do: move dropoff after hidden layer. p=0.2. better
+* mnet3: mobilenet v3. starts off with much better performance. gap decreases over time. at 200k, almost equal with other models.
+* vitb16: larger model (vit-base-patch16-224). image size 224px. normalized to 0.5x6 (not the same as others). pre-logits size 2048. Slower at first by almost caught up by 200k steps. Probably a good change, but increases training time a lot.
+* tvit-v2: dataset with std imagenet normalization. classifier head hidden 2048, DO after hidden p=0.2. AdamW optimizer, settings from paper (ImageNet-1k training from scratch). Didn't implement cosine annealing LR (too few epochs).
+  
+  Didn't make any progress at all. Training completely stalled.
+
+### Attempt #5 (optimizing TinyViT)
+
+The first attempt with TinyViT was very poor, much poorer than expected.
+Here we do some experiments to try and determine why.
+
+Baseline settings:
+
+* Standard ImageNet normalization.
+* Data augmentation: same jitter as "aug2".
+* Classifier head: one hidden layer, size 2048.
+* Dropout p=0.2 after hidden layer.
+* Optimizer: AdamW with weight_decay=0.05.
+* LR: start at 1e-3, use ReduceLROnPlateau scheduler
+* Dataset: world + 10% im2gps_v2
+
+| Experiment | Log version | Train loss | Val loss | Val F1 |
+| ---------- | ----------- | - | - | - |
+| tvit-v2             | 15    | 0.4917 | 0.680 | 0.0022 |
+| adam                | 16    | 0.5195 | 0.685 | 0.0022 |
+| no-hidden           | 17    | 
+
+Experiments:
+
+* adam: use Adam optimizer with no weight decay.
+  
+  No difference from baseline.
+* no-hidden: classifier head is direct. No dropout. AdamW
+
+### Next: try a few different models
+### Next: does no-hidden help?
+### Next: does hierarchical classification head help?
+
+First classify top level cells
+Using top level logits + features, classify next level cells
+Using all of above, classify next level cells
+(Could be pretty inefficient...)
+
+### Next: just im2gps 2007? (is the old dataset better? same val though)
+### Next: more aggressive LR scheduler
+
+### Manually inspect val set
+
+Manually inspected.
+World1 looks good, as expected.
+Im2gps_v2 is >90% good.
+Some shots are still indoors, or too narrow FOV.
+Can potentially do some more cleaning.
+
+### Next: why was mobilenet v3 so good?

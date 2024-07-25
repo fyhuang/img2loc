@@ -37,23 +37,33 @@ def auto_shuffle_size():
         return DEFAULT
 
 NORMALIZE_T = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+NORM_HALF_T = T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 UNNORMALIZE_T = T.Normalize(mean=[-0.485/0.229, -0.456/0.224, -0.406/0.225], std=[1/0.229, 1/0.224, 1/0.225])
 
+JITTER_FULL_T = T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1)
+JITTER_BC_T = T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.01, hue=0.01)
+JITTER_LESS_T = T.ColorJitter(brightness=0.01, contrast=0.01, saturation=0, hue=0)
+
+IMG_CROP_SIZE = 224
+#IMG_CROP_SIZE = 384
+
 TRAIN_T = T.Compose([
-    T.RandomResizedCrop(224),
+    T.RandomResizedCrop(IMG_CROP_SIZE),
     T.RandomHorizontalFlip(),
     T.ToImage(),
-    T.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+    JITTER_LESS_T,
     T.ToDtype(torch.float32, scale=True),
     NORMALIZE_T,
+    #NORM_HALF_T,
 ])
 
 VAL_T = T.Compose([
-    T.Resize(224),
-    T.CenterCrop(224),
+    T.Resize(IMG_CROP_SIZE),
+    T.CenterCrop(IMG_CROP_SIZE),
     T.ToImage(),
     T.ToDtype(torch.float32, scale=True),
     NORMALIZE_T,
+    #NORM_HALF_T,
 ])
 
 VAL_ZOOM_T = T.Compose([
@@ -91,8 +101,8 @@ class _GeoDatasetTransformer:
     def make_to_img_label(self, val=True):
         def to_img_label(sample):
             img, meta = sample
-            #transformed_img = VAL_T(img) if val else TRAIN_T(img)
-            transformed_img = VAL_ZOOM_T(img) if val else TRAIN_T(img)
+            transformed_img = VAL_T(img) if val else TRAIN_T(img)
+            #transformed_img = VAL_ZOOM_T(img) if val else TRAIN_T(img)
             labels = self.meta_to_label_tensor(meta)
             if labels is None:
                 return None
@@ -292,39 +302,38 @@ class Img2LocCombined:
         mapping = label_mapping.LabelMapping.read_csv(self.root / f"{s2cell_mapping_name}.csv")
         self.transformer = _GeoDatasetTransformer(mapping, s2cell_mapping.S2CellMapping.from_label_mapping(mapping))
 
-    def train_dataloader(self):
-        # Total is ~1.8m examples
-        urls = [
-            # im2gps 2007 is ~591k examples
-            str(self.root / "im2gps_2007/im2gps_2007_train_{000..028}.tar"),
-            # im2gps 2023 is ~1.05m examples
-            str(self.root / "im2gps_2023/im2gps_2023_{000..044}.tar"),
-            # Repeat a few times to balance the dataset
-            # ~40k examples x3 == ~120k
-            str(self.root / "world1/world1_{000..001}.tar"),
-            str(self.root / "world1/world1_{000..001}.tar"),
-            str(self.root / "world1/world1_{000..001}.tar"),
-        ]
-        ds = urls_to_dataset(urls, self.transformer, val=False, shuffle=True, load_img=True)
-        return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
+    def train_dataloader(self, subset=0):
+        # Total is ~800k examples
+        if subset == 0:
+            urls = [
+                # im2gps v2 is ~773k examples
+                str(self.root / "im2gps_v2/im2gps_v2_train_{000..040}.tar"),
+                # ~38k examples
+                str(self.root / "world1/world1_train_{000..001}.tar"),
+            ]
+        elif subset == 1:
+            # only world
+            urls = str(self.root / "world1/world1_train_{000..001}.tar")
+        elif subset == 2:
+            # world + ~10% of im2gps
+            urls = [
+                str(self.root / "world1/world1_train_{000..001}.tar"),
+                str(self.root / "im2gps_v2/im2gps_v2_train_{000..004}.tar"),
+            ]
+        elif subset == 3:
+            # world + 50% of im2gps
+            urls = [
+                str(self.root / "world1/world1_train_{000..001}.tar"),
+                str(self.root / "im2gps_v2/im2gps_v2_train_{000..019}.tar"),
+            ]
 
-    def train_dataloader_small(self):
-        # Total is ~720k examples
-        urls = [
-            # im2gps 2007 is ~591k examples
-            str(self.root / "im2gps_2007/im2gps_2007_train_{000..028}.tar"),
-            # Repeat a few times to balance the dataset
-            # ~40k examples x3 == ~120k
-            str(self.root / "world1/world1_{000..001}.tar"),
-            str(self.root / "world1/world1_{000..001}.tar"),
-            str(self.root / "world1/world1_{000..001}.tar"),
-        ]
         ds = urls_to_dataset(urls, self.transformer, val=False, shuffle=True, load_img=True)
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())
 
     def val_dataloader(self):
         urls = [
-            str(self.root / "im2gps_2007/im2gps_2007_val_{000..007}.tar"),
+            str(self.root / "im2gps_v2/im2gps_v2_val_000.tar"),
+            str(self.root / "world1/world1_val_000.tar"),
         ]
         ds = urls_to_dataset(urls, self.transformer, val=True, shuffle=True, load_img=True)
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())

@@ -58,7 +58,7 @@ def efn_linear_init(layer):
     nn.init.uniform_(layer.weight, -init_range, init_range)
     nn.init.zeros_(layer.bias)
 
-def make_efnv2_s_model(num_classes, dropout, hidden):
+def make_efnv2_s_model(num_classes, dropout, hidden, dropout2=None):
     efn = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.DEFAULT)
 
     # dropout = 0.2
@@ -76,16 +76,27 @@ def make_efnv2_s_model(num_classes, dropout, hidden):
         efn_linear_init(efn.classifier[1])
     else:
         # lr = 7.5e-4
-        efn.classifier = nn.Sequential(
+        print(f"Hidden size = {hidden}, dropout = {dropout}, dropout2 = {dropout2}")
+        layers = [
             nn.Dropout(p=dropout, inplace=True),
-            nn.Linear(1280, 1024),
+            nn.Linear(1280, hidden),
+        ]
+
+        if dropout2 is not None:
+            layers.append(nn.Dropout(p=dropout2, inplace=True))
+
+        layers += [
             nn.SiLU(inplace=True),
-            nn.Linear(1024, num_classes),
+            nn.Linear(hidden, num_classes),
+        ]
+
+        efn.classifier = nn.Sequential(
+            *layers
             #nn.Sigmoid(),
         )
 
         efn_linear_init(efn.classifier[1])
-        efn_linear_init(efn.classifier[3])
+        efn_linear_init(efn.classifier[-1])
 
     return efn
 
@@ -116,10 +127,11 @@ def make_vitb16_model(num_classes):
     # mlp_dim = 3072
     # lr = 3e-4
 
+    pre_logits_size = 2048
     heads_layers = collections.OrderedDict()
-    heads_layers["pre_logits"] = nn.Linear(768, 1280)
+    heads_layers["pre_logits"] = nn.Linear(768, pre_logits_size)
     heads_layers["act"] = nn.Tanh()
-    heads_layers["head"] = nn.Linear(1280, num_classes)
+    heads_layers["head"] = nn.Linear(pre_logits_size, num_classes)
     vitb.heads = nn.Sequential(heads_layers)
 
     fan_in = vitb.heads.pre_logits.in_features
@@ -131,7 +143,7 @@ def make_vitb16_model(num_classes):
 
     return vitb
 
-def make_tinyvit_21m224_model(num_classes):
+def make_tinyvit_21m224_model(num_classes, dropout, hidden):
     tvit = tiny_vit_21m_224(pretrained=True)
 
     # embed_dims = [96, 192, 384, 576]
@@ -142,11 +154,41 @@ def make_tinyvit_21m224_model(num_classes):
     # https://github.com/wkcn/TinyViT/blob/main/configs/higher_resolution/tiny_vit_21m_224to384.yaml
     # https://github.com/wkcn/TinyViT/blob/main/configs/higher_resolution/tiny_vit_21m_384to512.yaml
 
-    tvit.head = nn.Linear(576, num_classes)
-    nn.init.trunc_normal_(tvit.head.weight, std=0.02)
-    nn.init.zeros_(tvit.head.bias)
+    if hidden:
+        classifier = nn.Sequential(
+            nn.Linear(576, hidden),
+            nn.SiLU(inplace=True),
+            nn.Dropout(p=dropout, inplace=True),
+            nn.Linear(hidden, num_classes),
+        )
+
+        nn.init.trunc_normal_(classifier[0].weight, std=0.02)
+        nn.init.zeros_(classifier[0].bias)
+
+        nn.init.trunc_normal_(classifier[-1].weight, std=0.02)
+        nn.init.zeros_(classifier[-1].bias)
+
+        tvit.head = classifier
+    else:
+        tvit.head = nn.Linear(576, num_classes)
 
     return tvit
+
+def make_mnet3_model(num_classes, dropout):
+    mnet3 = models.mobilenet_v3_large(weights="IMAGENET1K_V2")
+
+    hidden_size = 2048
+    mnet3.classifier = nn.Sequential(
+        nn.Linear(mnet3.classifier[0].in_features, hidden_size),
+        nn.Hardswish(inplace=True),
+        nn.Dropout(p=dropout, inplace=True),
+        nn.Linear(hidden_size, num_classes), # out is 1776
+    )
+
+    torch.nn.init.xavier_uniform_(mnet3.classifier[0].weight)
+    torch.nn.init.xavier_uniform_(mnet3.classifier[3].weight)
+
+    return mnet3
 
 
 
@@ -158,16 +200,25 @@ class S2CellClassifierTask(L.LightningModule):
         if model_name == "efn_v2_s":
             self.model = make_efnv2_s_model(len(label_mapping), dropout=dropout, hidden=False)
         elif model_name == "efn_v2_s2":
-            self.model = make_efnv2_s_model(len(label_mapping), dropout=dropout, hidden=True)
+            self.model = make_efnv2_s_model(len(label_mapping), dropout=dropout, hidden=1024)
+        elif model_name == "efn_v2_s3":
+            self.model = make_efnv2_s_model(len(label_mapping), dropout=dropout, hidden=2048)
+        elif model_name == "efn_v2_s4":
+            self.model = make_efnv2_s_model(len(label_mapping), dropout=0.0, hidden=2048, dropout2=dropout)
         elif model_name == "efn_v2_m":
             self.model = make_efnv2_m_model(len(label_mapping), dropout=dropout)
         elif model_name == "vitb16":
             self.model = make_vitb16_model(len(label_mapping))
         elif model_name == "tinyvit_21m_224":
-            self.model = make_tinyvit_21m224_model(len(label_mapping))
+            self.model = make_tinyvit_21m224_model(len(label_mapping), dropout=0.0, hidden=None)
+        elif model_name == "tinyvit_21m_224_v2":
+            self.model = make_tinyvit_21m224_model(len(label_mapping), dropout=dropout, hidden=2048)
+        elif model_name == "mnet3":
+            self.model = make_mnet3_model(len(label_mapping), dropout=dropout)
         else:
             raise NotImplementedError(f"No model: {model_name}")
 
+        print(f"Model: {model_name}")
         self.save_hyperparameters("dropout", "learning_rate")
         self.learning_rate = learning_rate
 
@@ -255,9 +306,14 @@ class S2CellClassifierTask(L.LightningModule):
         return self.forward(batch)
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(
+        #optimizer = optim.Adam(
+        #    self.parameters(),
+        #    lr=self.learning_rate,
+        #)
+        optimizer = optim.AdamW(
             self.parameters(),
             lr=self.learning_rate,
+            weight_decay=0.05,
         )
 
         if self.overfit:
@@ -281,13 +337,13 @@ class S2CellClassifierTask(L.LightningModule):
                 "lr_scheduler": {
                     "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
                         optimizer,
-                        mode="max",
+                        mode="min",
                         factor=0.5,
-                        patience=15,
+                        patience=50,
                     ),
-                    "monitor": "val_f1",
+                    "monitor": "train_loss_step",
                     "interval": "step",
-                    "frequency": 10000,
+                    "frequency": 1000,
                 },
             }
 
@@ -297,6 +353,7 @@ def main():
     parser.add_argument("--accelerator", type=str, default="gpu")
     parser.add_argument("--ckpt_path", type=str, default=None)
     parser.add_argument("--limit_batches", type=float, default=None)
+    parser.add_argument("--max_steps", type=int, default=-1)
 
     parser.add_argument(
         "--mode",
@@ -312,9 +369,8 @@ def main():
     world1 = World1()
     combined_dataset = Img2LocCombined()
     if args.mode != "overfit":
-        #train_dataloader = combined_dataset.train_dataloader()
+        train_dataloader = combined_dataset.train_dataloader(subset=2)
         #train_dataloader = world1.train_dataloader()
-        train_dataloader = combined_dataset.train_dataloader_small()
         val_dataloader = combined_dataset.val_dataloader()
     else:
         if args.overfit == "1":
@@ -332,6 +388,18 @@ def main():
         "learning_rate": 1.0e-3,
     }
 
+    model_hparams_efn_v2_s3 = {
+        "model_name": "efn_v2_s3",
+        "dropout": 0.2,
+        "learning_rate": 1.0e-3,
+    }
+
+    model_hparams_efn_v2_s4 = {
+        "model_name": "efn_v2_s4",
+        "dropout": 0.2,
+        "learning_rate": 1.0e-3,
+    }
+
     model_hparams_vitb16 = {
         "model_name": "vitb16",
         "dropout": 0.0,
@@ -341,7 +409,20 @@ def main():
     model_hparams_tinyvit_21m_224 = {
         "model_name": "tinyvit_21m_224",
         "dropout": 0.0,
-        "learning_rate": 2.5e-4,
+        #"learning_rate": 2.5e-4,
+        "learning_rate": 1.0e-3,
+    }
+
+    model_hparams_tinyvit_21m_224_v2 = {
+        "model_name": "tinyvit_21m_224_v2",
+        "dropout": 0.2,
+        "learning_rate": 1.0e-3,
+    }
+
+    model_hparams_mnet3 = {
+        "model_name": "mnet3",
+        "dropout": 0.2,
+        "learning_rate": 1e-3,
     }
 
     task = S2CellClassifierTask(
@@ -417,6 +498,8 @@ def main():
         accelerator=args.accelerator,
         callbacks=callbacks,
         val_check_interval=val_check_interval,
+        check_val_every_n_epoch=None,
+        max_steps=args.max_steps,
         logger=L.pytorch.loggers.TensorBoardLogger(
             save_dir=".",
             #log_graph=True,
