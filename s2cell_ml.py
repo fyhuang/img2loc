@@ -32,7 +32,9 @@ import tqdm
 from mlutil import label_mapping, s2cell_mapping, geoguessr_score
 from datasets import World1, Img2LocCombined, Im2gps2007
 
-from tiny_vit import tiny_vit_21m_224
+import timm
+#from tiny_vit import tiny_vit_21m_224
+
 
 def make_efn_model():
     efn = models.efficientnet_b5(weights=models.EfficientNet_B5_Weights.DEFAULT)
@@ -147,12 +149,22 @@ def make_tinyvit_21m224_model(num_classes, dropout, hidden):
     tvit = tiny_vit_21m_224(pretrained=True)
 
     # embed_dims = [96, 192, 384, 576]
+    # depths = [2, 2, 6, 2]
     # drop_path_rate = 0.2
+    # layer_lr_decay = 1.0
 
     # LRs at configs:
     # https://github.com/wkcn/TinyViT/blob/main/configs/22kto1k/tiny_vit_21m_22kto1k.yaml
     # https://github.com/wkcn/TinyViT/blob/main/configs/higher_resolution/tiny_vit_21m_224to384.yaml
     # https://github.com/wkcn/TinyViT/blob/main/configs/higher_resolution/tiny_vit_21m_384to512.yaml
+
+    def _set_lr_scale(m, scale):
+        for p in m.parameters():
+            p.lr_scale = scale
+
+    decay_rate = 1.0
+    depths_sum = sum([2, 2, 6, 2])
+    last_lr_scale = decay_rate ** (depths_sum - 3 - 1)
 
     if hidden:
         classifier = nn.Sequential(
@@ -168,10 +180,47 @@ def make_tinyvit_21m224_model(num_classes, dropout, hidden):
         nn.init.trunc_normal_(classifier[-1].weight, std=0.02)
         nn.init.zeros_(classifier[-1].bias)
 
+        classifier[0].apply(lambda m: _set_lr_scale(m, last_lr_scale))
+        classifier[-1].apply(lambda m: _set_lr_scale(m, last_lr_scale))
+
         tvit.head = classifier
     else:
         tvit.head = nn.Linear(576, num_classes)
+        nn.init.trunc_normal_(tvit.head.weight, std=0.02)
+        nn.init.zeros_(tvit.head.bias)
 
+        tvit.head.apply(lambda m: _set_lr_scale(m, last_lr_scale))
+
+    #def _check_lr_scale(m):
+    #    for p in m.parameters():
+    #        assert hasattr(p, 'lr_scale'), p.param_name
+    #tvit.apply(_check_lr_scale)
+
+    def _enable_grad(m):
+        for p in m.parameters():
+            p.requires_grad = True
+    tvit.apply(_enable_grad)
+
+    return tvit
+
+def make_tinyvit_21m224_timm_model(num_classes, dropout, hidden):
+    tvit = timm.create_model(
+        "hf-hub:timm/tiny_vit_21m_224.dist_in22k",
+        pretrained=True,
+        num_classes=num_classes,
+    )
+
+    if hidden is not None:
+        from functools import partial
+        tvit.head = timm.layers.NormMlpClassifierHead(
+            in_features=576,
+            num_classes=num_classes,
+            hidden_size=hidden,
+            drop_rate=dropout,
+            pool_type="avg",
+            norm_layer=partial(timm.layers.LayerNorm2d, eps=1e-5),
+        )
+        
     return tvit
 
 def make_mnet3_model(num_classes, dropout):
@@ -210,11 +259,13 @@ class S2CellClassifierTask(L.LightningModule):
         elif model_name == "vitb16":
             self.model = make_vitb16_model(len(label_mapping))
         elif model_name == "tinyvit_21m_224":
-            self.model = make_tinyvit_21m224_model(len(label_mapping), dropout=0.0, hidden=None)
+            self.model = make_tinyvit_21m224_timm_model(len(label_mapping), dropout=0.0, hidden=None)
         elif model_name == "tinyvit_21m_224_v2":
-            self.model = make_tinyvit_21m224_model(len(label_mapping), dropout=dropout, hidden=2048)
+            self.model = make_tinyvit_21m224_timm_model(len(label_mapping), dropout=dropout, hidden=2048)
         elif model_name == "mnet3":
             self.model = make_mnet3_model(len(label_mapping), dropout=dropout)
+        elif model_name == "resnet50.a1_in1k":
+            self.model = timm.create_model("resnet50.a1_in1k", pretrained=True, num_classes=len(label_mapping))
         else:
             raise NotImplementedError(f"No model: {model_name}")
 
@@ -313,39 +364,51 @@ class S2CellClassifierTask(L.LightningModule):
         optimizer = optim.AdamW(
             self.parameters(),
             lr=self.learning_rate,
-            weight_decay=0.05,
+            #weight_decay=0.05,
+            weight_decay=1e-8,
         )
 
-        if self.overfit:
-            return {
-                "optimizer": optimizer,
-                "lr_scheduler": {
-                    "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
-                        optimizer,
-                        mode="max",
-                        factor=0.5,
-                        patience=50,
-                    ),
-                    "monitor": "val_f1",
-                    "interval": "epoch",
-                    "frequency": 1,
-                },
-            }
-        else:
-            return {
-                "optimizer": optimizer,
-                "lr_scheduler": {
-                    "scheduler": optim.lr_scheduler.ReduceLROnPlateau(
-                        optimizer,
-                        mode="min",
-                        factor=0.5,
-                        patience=50,
-                    ),
-                    "monitor": "train_loss_step",
-                    "interval": "step",
-                    "frequency": 1000,
-                },
-            }
+        # For ~30 epochs
+        scheduler = optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[
+                optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end_factor=1.0, total_iters=5),
+                optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=25, eta_min=1e-6),
+                optim.lr_scheduler.ConstantLR(optimizer, factor=1e-6, total_iters=float('inf')),
+            ],
+            milestones=[5, 30],
+        )
+
+        # For ~15 epochs (w+20%)
+        #scheduler = optim.lr_scheduler.SequentialLR(
+        #    optimizer,
+        #    schedulers=[
+        #        optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end_factor=1.0, total_iters=3),
+        #        optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=13, eta_min=1e-6),
+        #        optim.lr_scheduler.ConstantLR(optimizer, factor=1e-6, total_iters=float('inf')),
+        #    ],
+        #    milestones=[3, 16],
+        #)
+
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                #"scheduler": optim.lr_scheduler.ReduceLROnPlateau(
+                #    optimizer,
+                #    mode="min",
+                #    factor=0.5,
+                #    patience=50,
+                #),
+                #"interval": "step",
+                #"frequency": 1000,
+                #"monitor": "train_loss_step",
+
+                "scheduler": scheduler,
+                "interval": "epoch",
+                "frequency": 1,
+            },
+        }
 
 
 def main():
@@ -369,7 +432,7 @@ def main():
     world1 = World1()
     combined_dataset = Img2LocCombined()
     if args.mode != "overfit":
-        train_dataloader = combined_dataset.train_dataloader(subset=2)
+        train_dataloader = combined_dataset.train_dataloader(subset=0)
         #train_dataloader = world1.train_dataloader()
         val_dataloader = combined_dataset.val_dataloader()
     else:
@@ -409,14 +472,16 @@ def main():
     model_hparams_tinyvit_21m_224 = {
         "model_name": "tinyvit_21m_224",
         "dropout": 0.0,
-        #"learning_rate": 2.5e-4,
-        "learning_rate": 1.0e-3,
+        "learning_rate": 5.0e-4,
+        #"learning_rate": 1.0e-3,
+        #"learning_rate": 1.0e-4,
     }
 
     model_hparams_tinyvit_21m_224_v2 = {
         "model_name": "tinyvit_21m_224_v2",
         "dropout": 0.2,
-        "learning_rate": 1.0e-3,
+        #"learning_rate": 1.0e-3,
+        "learning_rate": 5.0e-4,
     }
 
     model_hparams_mnet3 = {
@@ -428,6 +493,7 @@ def main():
     task = S2CellClassifierTask(
         label_mapping=world1.label_mapping,
         overfit=(args.mode == "overfit"),
+        #model_name="resnet50.a1_in1k", dropout=0.0, learning_rate=1e-3,
         **model_hparams_tinyvit_21m_224,
     )
 
@@ -459,13 +525,11 @@ def main():
 
     #val_check_interval = 5000
     #callback_interval = 5000
-    val_check_interval = 10000
-    callback_interval = 10000
-    stopping_patience = 5 # epochs; TODO
+    val_check_interval = 2500
+    callback_interval = 2500
     if args.mode == "overfit":
-        val_check_interval = 1.0
-        callback_interval = None
-        stopping_patience = 30
+        val_check_interval = 1000
+        callback_interval = 1000
 
     callbacks = [
         L.pytorch.callbacks.ModelCheckpoint(
@@ -475,12 +539,6 @@ def main():
             save_top_k=3,
             every_n_train_steps=callback_interval,
         ),
-        #L.pytorch.callbacks.EarlyStopping(
-        #    patience=stopping_patience,
-        #    monitor="val_acc",
-        #    mode="max",
-        #    verbose=True,
-        #),
         L.pytorch.callbacks.LearningRateMonitor(
             logging_interval="step"
         ),

@@ -15,8 +15,10 @@ def auto_batch_size():
         dev_name = torch.cuda.get_device_name(0)
         if dev_name == 'NVIDIA A10':
             return 64
+        elif dev_name == 'NVIDIA GeForce RTX 3090':
+            return 64
         else:
-            print("auto_batch_size: unknown device", dev_name)
+            print(f"auto_batch_size: unknown device \"{dev_name}\"")
             return DEFAULT
     except:
         return DEFAULT
@@ -31,7 +33,7 @@ def auto_shuffle_size():
         if dev_name == 'NVIDIA A10':
             return 100_000
         else:
-            print("auto_batch_size: unknown device", dev_name)
+            print(f"auto_shuffle_size: unknown device \"{dev_name}\"")
             return DEFAULT
     except:
         return DEFAULT
@@ -326,6 +328,15 @@ class Img2LocCombined:
                 str(self.root / "world1/world1_train_{000..001}.tar"),
                 str(self.root / "im2gps_v2/im2gps_v2_train_{000..019}.tar"),
             ]
+        elif subset == 4:
+            # world + 20% of im2gps
+            # total examples: ~205k
+            urls = [
+                str(self.root / "world1/world1_train_{000..001}.tar"),
+                str(self.root / "im2gps_v2/im2gps_v2_train_{000..008}.tar"),
+            ]
+        else:
+            raise ValueError(f"Invalid subset {subset}")
 
         ds = urls_to_dataset(urls, self.transformer, val=False, shuffle=True, load_img=True)
         return wds.WebLoader(ds, batch_size=None, num_workers=auto_dataloader_workers())

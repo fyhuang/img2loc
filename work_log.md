@@ -297,9 +297,17 @@ Notes:
   
   Didn't make any progress at all. Training completely stalled.
 
+#### Manually inspect val set
+
+* World1 looks good, as expected.
+* Im2gps_v2 is >90% good.
+* Some shots are still indoors, or too narrow FOV.
+* Can potentially do some more cleaning.
+
 ### Attempt #5 (optimizing TinyViT)
 
 The first attempt with TinyViT was very poor, much poorer than expected.
+Train loss was basically flat.
 Here we do some experiments to try and determine why.
 
 Baseline settings:
@@ -316,33 +324,94 @@ Baseline settings:
 | ---------- | ----------- | - | - | - |
 | tvit-v2             | 15    | 0.4917 | 0.680 | 0.0022 |
 | adam                | 16    | 0.5195 | 0.685 | 0.0022 |
-| no-hidden           | 17    | 
+| no-hidden           | 17    | x | x | x |
 
 Experiments:
 
 * adam: use Adam optimizer with no weight decay.
   
   No difference from baseline.
-* no-hidden: classifier head is direct. No dropout. AdamW
+* no-hidden: classifier head is direct. No dropout. AdamW. Forgot to initialize weights of layer...
 
-### Next: try a few different models
-### Next: does no-hidden help?
+  No difference from baseline.
+
+* debug with overfit set
+* double check if layers frozen
+* gradient clipping
+* other stuff from the paper (depth something)
+
+### Debugging TinyViT
+
+* Overfit-1. log_version=0. With no hidden layer or dropout. No problem, gets to val_f1=0.3 within 3000 steps.
+* Overfit-5. log_version=1. Could not learn, loss is flat.
+* Overfit-5. log_version=4. Fix LR scale on classification head layer. Also initialize head layer weights/bias. Might not do much, seems like decay_scale is 1.0 anyway.
+
+  Didn't do anything. Could not learn, loss is flat.
+* Overfit-5. log_version=5. Make sure all layers requires_grad=True. Didn't do anything.
+* Overfit-5. log_version=8. Use model directly from timm (tiny_vit_21m_224.dist_in22k) with num_classes=X. Didn't do much.
+* log_version=10. Use another model (resnet50.a1_in1k) from timm for sanity check. Worked.
+* log_version=11. TinyViT. Much higher LR=1e-1. Bad.
+* log_version=12. TinyViT. Much lower LR=1e-5. Slightly better (loss decreases for 2-3k steps), but performance is still very bad.
+* log_version=13. TinyViT. LR=1e-6. Not as good as 1e-5.
+* log_version=14. TinyViT. LR=1e-4. Actually working!
+
+### Attempt #6 (optimizing TinyViT again)
+
+First try to find the best settings on overfit set.
+
+* Standard ImageNet normalization.
+* Data augmentation: same jitter as "aug2".
+* Optimizer: AdamW with weight_decay=0.05.
+* Dataset: world overfit-5.
+* Max steps: 20k (~30 epochs).
+
+| Experiment | Log version | Train loss | Val loss | Val F1 |
+| ---------- | ----------- | - | - | - |
+| lr=1e-4              | 0 | 0.0411 | 0.0155 | 0.4488 |
+| cosine lr            | 4 | 0.0398 | 0.0102 | 0.4321 |
+| cosine-lr-30         | 5 | 0.0247 | 0.0047 | 0.5964 |
+
+* lr=1e-4 with ReduceLROnPlateau scheduler.
+* Cosine LR with warmup. (Use values from paper for 22k-to-1k fine-tuning, 10 warm-ups epochs instead of 5, ~60 total epochs instead of 30. Unclear if optimizer/weight decay is Adam or AdamW, here we use AdamW.) Oops, messed up the epoch count.
+* Cosine LR, 5 epochs warmup + 25 epochs cosine. Very good.
+
+### Attempt #7 (TinyViT after finding a good LR)
+
+Baseline settings:
+
+* TinyViT from timm.
+* Standard ImageNet normalization.
+* Data augmentation: same jitter as "aug2".
+* Optimizer: AdamW with weight_decay=0.05.
+* LR: start at 1e-3, use ReduceLROnPlateau scheduler
+* Dataset: world + 10% im2gps_v2
+* Max steps: 50k @ batch size 64 (~25 epochs)
+
+| Experiment | Log version | Train loss | Val loss | Val F1 |
+| ---------- | ----------- | - | - | - |
+| tvit                 | 4 | 0.1139 | 0.5600 | 0.1338 |
+| hidden-2048          | 5 | 0.1184 | 0.6547 | 0.1306 |
+| hidden-2048-do       | 6 | 0.1409 | 0.6095 | 0.1228 |
+| tvit-aug             | 7 | 0.1301 | 0.5483 | 0.1341 |
+| w+20%                | 8 |
+| w+100%               | 9 |
+
+* tvit. Cosine LR, 5 epochs warmup + 25 epochs cosine, max LR=5.0e-4. No pre-logits hidden layer. Oops, forgot to adjust val_check_interval.
+
+  Train loss looked good and went down steadily. However, both val loss and val F1 went up over the course of training.
+
+* hidden-2048. Same as above, but with hidden layer 2048. No dropout. Also adjusted val_check_interval.
+
+  Suspect overfitting. Val loss even higher.
+
+* hidden-2048-do. Same as hidden-2048 but with dropout=0.2. OK.
+* tvit-aug. No hidden. Increased jitter (0.1 for b/c, 0.01 for h/s). Better than tvit.
+* w+20%. world1 + 20% of im2gps. Same model (tvit with no hidden). Adjusted LR schedule (total 15 epochs).
+* w+100%. LR schedule adjusted for 30 epochs. max_steps=400k
+
 ### Next: does hierarchical classification head help?
 
 First classify top level cells
 Using top level logits + features, classify next level cells
 Using all of above, classify next level cells
 (Could be pretty inefficient...)
-
-### Next: just im2gps 2007? (is the old dataset better? same val though)
-### Next: more aggressive LR scheduler
-
-### Manually inspect val set
-
-Manually inspected.
-World1 looks good, as expected.
-Im2gps_v2 is >90% good.
-Some shots are still indoors, or too narrow FOV.
-Can potentially do some more cleaning.
-
-### Next: why was mobilenet v3 so good?
