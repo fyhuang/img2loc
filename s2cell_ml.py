@@ -243,7 +243,7 @@ def make_mnet3_model(num_classes, dropout):
 
 # Define a LightningModule for the classifier
 class S2CellClassifierTask(L.LightningModule):
-    def __init__(self, model_name, label_mapping, overfit, dropout, learning_rate):
+    def __init__(self, model_name, label_mapping, overfit, dropout, learning_rate, export=False):
         super().__init__()
 
         if model_name == "efn_v2_s":
@@ -277,6 +277,7 @@ class S2CellClassifierTask(L.LightningModule):
         self.label_mapping = label_mapping
         self.s2cell_mapping = s2cell_mapping.S2CellMapping.from_label_mapping(label_mapping)
         num_classes = len(label_mapping)
+        self.export = export
 
         # Example input array (for logging graph)
         self.example_input_array = torch.zeros(1, 3, 224, 224, dtype=torch.float32)
@@ -286,7 +287,10 @@ class S2CellClassifierTask(L.LightningModule):
         self.geo_score = geoguessr_score.GeoguessrScore()
 
     def forward(self, x):
-        return self.model(x)
+        y = self.model(x)
+        if self.export:
+            y = torch.sigmoid(y)
+        return y
 
     def logits_to_latlng(self, z):
         # Pick the best S2 cell from model's output and convert to lat/lng

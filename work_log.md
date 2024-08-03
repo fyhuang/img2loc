@@ -393,7 +393,7 @@ Baseline settings:
 | hidden-2048          | 5 | 0.1184 | 0.6547 | 0.1306 |
 | hidden-2048-do       | 6 | 0.1409 | 0.6095 | 0.1228 |
 | tvit-aug             | 7 | 0.1301 | 0.5483 | 0.1341 |
-| w+20%                | 8 |
+| w+20%                | 8 | 0.1634 | 0.3774 | 0.1087 |
 | w+100%               | 9 |
 
 * tvit. Cosine LR, 5 epochs warmup + 25 epochs cosine, max LR=5.0e-4. No pre-logits hidden layer. Oops, forgot to adjust val_check_interval.
@@ -407,6 +407,10 @@ Baseline settings:
 * hidden-2048-do. Same as hidden-2048 but with dropout=0.2. OK.
 * tvit-aug. No hidden. Increased jitter (0.1 for b/c, 0.01 for h/s). Better than tvit.
 * w+20%. world1 + 20% of im2gps. Same model (tvit with no hidden). Adjusted LR schedule (total 15 epochs).
+
+  While val_loss curve looked much better (only going up slightly at the end), the overall performance was not better.
+  However, this could have been because of fewer training epochs.
+
 * w+100%. LR schedule adjusted for 30 epochs. max_steps=400k
 
 ### Next: does hierarchical classification head help?
