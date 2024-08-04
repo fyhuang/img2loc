@@ -64,7 +64,7 @@ export class ImageInferenceHandler {
 
         if (this.session === null) {
             this.session = await ort.InferenceSession.create(
-                "https://media.githubusercontent.com/media/fyhuang/img2loc/main/exports/s2cell_ml_efn_v2_s2_train1.onnx",
+                "https://media.githubusercontent.com/media/fyhuang/img2loc/main/exports/s2cell_ml_tvit_release0.onnx",
                 { executionProviders: ["wasm"], graphOptimizationLevel: "all" }
             );
         }
