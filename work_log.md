@@ -394,7 +394,8 @@ Baseline settings:
 | hidden-2048-do       | 6 | 0.1409 | 0.6095 | 0.1228 |
 | tvit-aug             | 7 | 0.1301 | 0.5483 | 0.1341 |
 | w+20%                | 8 | 0.1634 | 0.3774 | 0.1087 |
-| w+100%               | 9 |
+| w+100%               | 9 | 0.1105 | 0.2827 | 0.1379 |
+| hier-w+20           | 11 |
 
 * tvit. Cosine LR, 5 epochs warmup + 25 epochs cosine, max LR=5.0e-4. No pre-logits hidden layer. Oops, forgot to adjust val_check_interval.
 
@@ -413,9 +414,4 @@ Baseline settings:
 
 * w+100%. LR schedule adjusted for 30 epochs. max_steps=400k
 
-### Next: does hierarchical classification head help?
-
-First classify top level cells
-Using top level logits + features, classify next level cells
-Using all of above, classify next level cells
-(Could be pretty inefficient...)
+* hier-w+20. same dataset as w+20%. hierarchical classification head. No large difference.

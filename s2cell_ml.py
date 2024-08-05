@@ -29,7 +29,7 @@ import webdataset as wds
 import s2sphere
 import tqdm
 
-from mlutil import label_mapping, s2cell_mapping, geoguessr_score
+from mlutil import label_mapping, s2cell_mapping, geoguessr_score, hier_s2_classifier
 from datasets import World1, Img2LocCombined, Im2gps2007
 
 import timm
@@ -203,7 +203,7 @@ def make_tinyvit_21m224_model(num_classes, dropout, hidden):
 
     return tvit
 
-def make_tinyvit_21m224_timm_model(num_classes, dropout, hidden):
+def make_tinyvit_21m224_timm_model(num_classes, dropout, hidden, hier=False):
     tvit = timm.create_model(
         "hf-hub:timm/tiny_vit_21m_224.dist_in22k",
         pretrained=True,
@@ -220,6 +220,9 @@ def make_tinyvit_21m224_timm_model(num_classes, dropout, hidden):
             pool_type="avg",
             norm_layer=partial(timm.layers.LayerNorm2d, eps=1e-5),
         )
+
+    if hier:
+        tvit.head = hier_s2_classifier.HierS2ClassifierHead(576, s2cell_mapping.S2CellMapping.from_label_mapping(label_mapping))
         
     return tvit
 
@@ -262,6 +265,8 @@ class S2CellClassifierTask(L.LightningModule):
             self.model = make_tinyvit_21m224_timm_model(len(label_mapping), dropout=0.0, hidden=None)
         elif model_name == "tinyvit_21m_224_v2":
             self.model = make_tinyvit_21m224_timm_model(len(label_mapping), dropout=dropout, hidden=2048)
+        elif model_name == "tinyvit_21m_224_v3":
+            self.model = make_tinyvit_21m224_timm_model(len(label_mapping), dropout=dropout, hidden=None, hier=True)
         elif model_name == "mnet3":
             self.model = make_mnet3_model(len(label_mapping), dropout=dropout)
         elif model_name == "resnet50.a1_in1k":
@@ -373,26 +378,26 @@ class S2CellClassifierTask(L.LightningModule):
         )
 
         # For ~30 epochs
-        scheduler = optim.lr_scheduler.SequentialLR(
-            optimizer,
-            schedulers=[
-                optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end_factor=1.0, total_iters=5),
-                optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=25, eta_min=1e-6),
-                optim.lr_scheduler.ConstantLR(optimizer, factor=1e-6, total_iters=float('inf')),
-            ],
-            milestones=[5, 30],
-        )
-
-        # For ~15 epochs (w+20%)
         #scheduler = optim.lr_scheduler.SequentialLR(
         #    optimizer,
         #    schedulers=[
-        #        optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end_factor=1.0, total_iters=3),
-        #        optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=13, eta_min=1e-6),
+        #        optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end_factor=1.0, total_iters=5),
+        #        optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=25, eta_min=1e-6),
         #        optim.lr_scheduler.ConstantLR(optimizer, factor=1e-6, total_iters=float('inf')),
         #    ],
-        #    milestones=[3, 16],
+        #    milestones=[5, 30],
         #)
+
+        # For ~15 epochs (w+20%)
+        scheduler = optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[
+                optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, end_factor=1.0, total_iters=3),
+                optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=13, eta_min=1e-6),
+                optim.lr_scheduler.ConstantLR(optimizer, factor=1e-6, total_iters=float('inf')),
+            ],
+            milestones=[3, 16],
+        )
 
 
         return {
@@ -436,7 +441,7 @@ def main():
     world1 = World1()
     combined_dataset = Img2LocCombined()
     if args.mode != "overfit":
-        train_dataloader = combined_dataset.train_dataloader(subset=0)
+        train_dataloader = combined_dataset.train_dataloader(subset=4)
         #train_dataloader = world1.train_dataloader()
         val_dataloader = combined_dataset.val_dataloader()
     else:
