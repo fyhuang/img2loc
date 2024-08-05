@@ -395,7 +395,7 @@ Baseline settings:
 | tvit-aug             | 7 | 0.1301 | 0.5483 | 0.1341 |
 | w+20%                | 8 | 0.1634 | 0.3774 | 0.1087 |
 | w+100%               | 9 | 0.1105 | 0.2827 | 0.1379 |
-| hier-w+20           | 11 |
+| hier-w+20           | 11 | 0.1538 | 0.3785 | 0.1050 |
 
 * tvit. Cosine LR, 5 epochs warmup + 25 epochs cosine, max LR=5.0e-4. No pre-logits hidden layer. Oops, forgot to adjust val_check_interval.
 
