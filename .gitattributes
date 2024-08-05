@@ -1,2 +1,0 @@
-checkpoints/** filter=lfs diff=lfs merge=lfs -text
-exports/** filter=lfs diff=lfs merge=lfs -text
